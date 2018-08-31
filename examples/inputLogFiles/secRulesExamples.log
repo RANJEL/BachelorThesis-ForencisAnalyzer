@@ -1,0 +1,37 @@
+Jan  1 00:00:00 /*This file was created in order to demonstrate SEC rule types:*/
+Jan  1 00:00:00 /*Note that if you add this file into Forensic Analyzer, you will have to specify Date Parsing Regex. You can just enter: ${LINUX_AUTH_DATE}*/
+Jan  1 00:00:00 /*SingleWithThreshold*/
+Nov  3 08:23:53 locust sshd[24267]: Failed password for root from 187.32.49.100 port 35854 ssh2
+Nov  3 08:23:53 locust sshd[24267]: Received disconnect from 187.32.49.100: 11: Bye Bye [preauth]
+Nov  3 10:44:45 locust sshd[6905]: pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.229.172.76  user=root
+Nov  3 10:44:47 locust sshd[6905]: Failed password for root from 221.229.172.76 port 60763 ssh2
+Nov  3 10:44:49 locust sshd[6905]: Failed password for root from 221.229.172.76 port 60763 ssh2
+Nov  3 10:45:47 locust sshd[6905]: Failed password for root from 221.229.172.76 port 60763 ssh2
+Jan  1 00:00:00 /*SingleWithSuppress*/
+Dec 16 14:26:09 test ufs: [ID 845546 kern.notice] NOTICE: alloc: /var: file system full
+Dec 16 14:26:10 test ufs: [ID 845546 kern.notice] NOTICE: alloc: /var: file system full
+Dec 16 14:26:11 test ufs: [ID 845546 kern.notice] NOTICE: alloc: /var: file system full
+Dec 16 14:26:12 test ufs: [ID 845546 kern.notice] NOTICE: alloc: /var: file system full
+Dec 16 14:26:13 test ufs: [ID 845546 kern.notice] NOTICE: alloc: /var: file system full
+Dec 16 14:26:14 test ufs: [ID 845546 kern.notice] NOTICE: alloc: /var: file system full
+Dec 16 14:26:15 test ufs: [ID 845546 kern.notice] NOTICE: alloc: /var: file system full
+Dec 16 14:26:16 test ufs: [ID 845546 kern.notice] NOTICE: alloc: /var: file system full
+Jan  1 00:00:00 /*Pair*/
+Dec 18 22:39:48 test kernel: nfs: server box1 not responding, still trying
+Dec 18 22:40:28 test kernel: nfs: server box1 not responding, still trying
+Dec 18 22:41:09 test kernel: nfs: server box1 not responding, still trying
+Dec 18 22:41:49 test kernel: nfs: server box1 not responding, still trying
+Dec 18 22:42:05 test kernel: nfs: server box1 OK
+Jan  1 00:00:00 /*UsingContexts*/
+Nov  3 10:42:49 locust sshd[6905]: Failed password for rivio from 187.32.49.101 port 60763 ssh2
+Nov  3 10:43:50 locust sshd[6905]: Accepted password for rivio from 187.32.49.101 port 60763 ssh2
+Nov  3 10:43:59 locust sshd[6905]: Accepted password for brno-bet from 78.102.65.252 port 60763 ssh2
+Nov  3 10:44:49 locust sshd[6905]: Failed password for ranjel from 221.228.144.13 port 60763 ssh2
+Nov  3 10:44:51 locust sshd[6905]: Accepted password for ranjel from 221.228.144.13 port 60763 ssh2
+Jan  1 00:00:00 /*PerlIntegration*/
+Feb  2 00:00:00 a
+Feb  2 00:00:00 b
+Feb  2 00:00:00 test
+Feb  2 00:00:00 test
+Feb  2 00:00:00 c
+Jan  1 00:00:00 /**/

@@ -1,0 +1,13 @@
+2016-10-30 05:55:17,924 fail2ban.server : INFO   Changed logging target to /var/log/fail2ban.log for Fail2ban v0.8.6
+2016-10-30 05:55:20,562 fail2ban.actions: WARNING [ssh] Unban 221.229.172.75
+2016-10-30 05:55:23,408 fail2ban.filter : INFO   Log rotation detected for /var/log/auth.log
+2016-10-30 05:55:35,421 fail2ban.filter : INFO   Log rotation detected for /var/log/auth.log
+2016-10-30 05:56:13,718 fail2ban.actions: WARNING [ssh] Ban 221.229.172.75
+2016-10-30 06:06:14,356 fail2ban.actions: WARNING [ssh] Unban 221.229.172.75
+2016-10-30 06:06:45,397 fail2ban.actions: WARNING [ssh] Ban 221.229.172.75
+2016-10-30 06:16:46,067 fail2ban.actions: WARNING [ssh] Unban 221.229.172.75
+2016-10-30 06:17:37,128 fail2ban.actions: WARNING [ssh] Ban 221.229.172.75
+2016-10-30 06:27:37,768 fail2ban.actions: WARNING [ssh] Unban 221.229.172.75
+2016-10-30 06:28:18,820 fail2ban.actions: WARNING [ssh] Ban 221.229.172.75
+2016-10-30 06:38:19,467 fail2ban.actions: WARNING [ssh] Unban 221.229.172.75
+

@@ -1,0 +1,933 @@
+[1mdiff --git a/sec b/sec[m
+[1mindex 70dc1b7..9a5bc2b 100644[m
+[1m--- a/sec[m
+[1m+++ b/sec[m
+[36m@@ -1,7 +1,7 @@[m
+ #!/usr/bin/perl -w[m
+ #[m
+[31m-# SEC (Simple Event Correlator) 2.7.11 - sec[m
+[31m-# Copyright (C) 2000-2017 Risto Vaarandi[m
+[32m+[m[32m# SEC+ (Simple Event Correlator+) 2.7.11.1 - sec+[m[41m[m
+[32m+[m[32m# Copyright (C) 2000-2017 Risto Vaarandi + Jan Lejnar[m[41m[m
+ #[m
+ # This program is free software; you can redistribute it and/or[m
+ # modify it under the terms of the GNU General Public License[m
+[36m@@ -152,6 +152,12 @@[m [muse vars qw([m
+         %variables[m
+         $version[m
+         $WIN32[m
+[32m+[m[32m        $parseEventTime[m[41m[m
+[32m+[m[32m        $parsedTimeOrder[m[41m[m
+[32m+[m[32m        $dontParseEventTime[m[41m[m
+[32m+[m[32m        %fileFormatName2Regex[m[41m[m
+[32m+[m[32m        $timeFilterFrom[m[41m[m
+[32m+[m[32m        $timeFilterTo[m[41m[m
+     );[m
+ [m
+ [m
+[36m@@ -163,6 +169,7 @@[m [muse Getopt::Long;[m
+ use Fcntl;[m
+ use Socket;[m
+ use IO::Handle;[m
+[32m+[m[32muse Date::Parse; # str2time()[m[41m[m
+ [m
+ # check if Sys::Syslog is available[m
+ [m
+[36m@@ -174,8 +181,8 @@[m [m$WIN32 = ($^O =~ /win/i && $^O !~ /cygwin/i && $^O !~ /darwin/i);[m
+ [m
+ # set version and usage variables[m
+ [m
+[31m-$SEC_VERSION = "SEC (Simple Event Correlator) 2.7.11";[m
+[31m-$SEC_COPYRIGHT = "Copyright (C) 2000-2017 Risto Vaarandi";[m
+[32m+[m[32m$SEC_VERSION = "SEC+ (Simple Event Correlator+) 2.7.11.1";[m[41m[m
+[32m+[m[32m$SEC_COPYRIGHT = "Copyright (C) 2000-2017 Risto Vaarandi + Jan Lejnar";[m[41m[m
+ [m
+ $SEC_USAGE = qq!Usage: $0 [options][m
+ [m
+[36m@@ -214,6 +221,11 @@[m [mOptions:[m
+   --testonly, --notestonly[m
+   --help, -?[m
+   --version[m
+[32m+[m[32m  --parseEventTime[m[41m[m
+[32m+[m[32m  --parsedTimeOrder[m[41m[m
+[32m+[m[32m  --dontParseEventTime[m[41m[m
+[32m+[m[32m  --timeFilterFrom=<month>/<day>[/<year>]:<hour>:<minute>:<second>[m[41m[m
+[32m+[m[32m  --timeFilterTo=<month>/<day>[/<year>]:<hour>:<minute>:<second>[m[41m[m
+ !;[m
+ [m
+ $SEC_LICENSE = q![m
+[36m@@ -364,6 +376,7 @@[m [muse constant DEFAULT_SOCKETTIMEOUT => 60;[m
+ use constant DEFAULT_BLOCKSIZE => 8192;[m
+ use constant DEFAULT_CLEANTIME => 1;[m
+ use constant DEFAULT_DUMPFILE => "/tmp/sec.dump";[m
+[32m+[m[32muse constant DEFAULT_LOGFORMATSFILE => "./res/logFormats.conf";[m[41m[m
+ [m
+ [m
+ ###############################################################[m
+[36m@@ -433,20 +446,25 @@[m [msub open_syslog {[m
+ #         connected to terminal, message will also be written there.[m
+ [m
+ sub log_msg {[m
+[31m-[m
+     my ($level) = shift(@_);[m
+[32m+[m[41m[m
+     my ($ltime, $msg);[m
+ [m
+     if ($debuglevel < $level) { return; }[m
+ [m
+[31m-    if (!$logopen && !$syslogopen && !-t STDERR) { return; }[m
+[31m-[m
+     $msg = join(" ", @_);[m
+[32m+[m[32m    $ltime = localtime(time()); # OK time() for logging[m[41m[m
+ [m
+[31m-    if (-t STDERR) { print STDERR "$msg\n"; }[m
+[32m+[m[32m    ################[m[41m[m
+[32m+[m[32m    # + Jan Lejnar #[m[41m[m
+[32m+[m[32m    ################[m[41m[m
+[32m+[m[32m    # For debugging allways print log message to STDERR - not only when the filehandle opened by a TTY (terminal)[m[41m[m
+[32m+[m[32m    print STDERR "$ltime: $msg\n";[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if (!$logopen && !$syslogopen) { return; }[m[41m[m
+[32m+[m[32m    ################[m[41m[m
+ [m
+     if ($logopen) {[m
+[31m-        $ltime = localtime(time());[m
+         print LOGFILE "$ltime: $msg\n";[m
+     }[m
+ [m
+[36m@@ -3589,7 +3607,7 @@[m [msub read_config {[m
+ [m
+     # Set the $lastconfigload variable to reflect the current time[m
+ [m
+[31m-    $lastconfigload = time();[m
+[32m+[m[32m    $lastconfigload = time(); # OK[m[41m[m
+ [m
+     # Initialize global arrays %configuration, %config_ltimes, %config_mtimes,[m
+     # %config_options, @calendar, @conffiles, %cfset2cfile, @maincfiles.[m
+[36m@@ -3691,7 +3709,7 @@[m [msub soft_read_config {[m
+ [m
+     # Set the $lastconfigload variable to reflect the current time[m
+ [m
+[31m-    $lastconfigload = time();[m
+[32m+[m[32m    $lastconfigload = time(); # OK[m[41m[m
+ [m
+     # Initialize global arrays %configuration, %config_ltimes, %config_mtimes,[m
+     # %config_options, @calendar, @conffiles, %cfset2cfile, @maincfiles.[m
+[36m@@ -3868,7 +3886,7 @@[m [msub substitute_actionlist_var {[m
+ [m
+     if (index($_[0], "%") == - 1) { return; }[m
+ [m
+[31m-    my ($time) = time();[m
+[32m+[m[32m    my ($time) = time(); # ?[m[41m[m
+ [m
+     # if builtin time-based action list variables do not reflect the current[m
+     # second, set these variables to proper values[m
+[36m@@ -4715,6 +4733,7 @@[m [msub execute_tcpsock_action {[m
+ [m
+         if (!defined($ret) || $ret <= 0) {[m
+             if (time() - $output_tcpconn{$peer}->{"time"} > $socket_timeout) {[m
+[32m+[m[32m                # OK socket[m[41m[m
+                 log_msg(LOG_DEBUG,[m
+                     "Can't connect to TCP peer '$peer' (connection establishment timeout)");[m
+                 delete $output_tcpconn{$peer};[m
+[36m@@ -4781,7 +4800,7 @@[m [msub execute_tcpsock_action {[m
+         if ($! == EINPROGRESS) {[m
+             $output_tcpconn{$peer} = { "socket" => $handle,[m
+                 "buffer"                        => [ $event ],[m
+[31m-                "time"                          => time() };[m
+[32m+[m[32m                "time"                          => time() }; # OK socket[m[41m[m
+         } else {[m
+             log_msg(LOG_DEBUG,[m
+                 "Can't connect to TCP peer '$peer' for sending event '$event' ($!)");[m
+[36m@@ -4955,7 +4974,7 @@[m [msub execute_create_action {[m
+ [m
+             if (!exists($context_list{$context}->{"Internal"})) {[m
+ [m
+[31m-                $context_list{$context}->{"Time"} = time();[m
+[32m+[m[32m                $context_list{$context}->{"Time"} = getTimeAccordingToSecParams(); # updating context[m[41m[m
+                 $context_list{$context}->{"Window"} = $lifetime;[m
+                 $context_list{$context}->{"Action"} = $list;[m
+                 $context_list{$context}->{"Desc"} = $text;[m
+[36m@@ -4968,13 +4987,12 @@[m [msub execute_create_action {[m
+ [m
+         } else {[m
+ [m
+[31m-            $context_list{$context} = { "Time" => time(),[m
+[32m+[m[32m            $context_list{$context} = { "Time" => getTimeAccordingToSecParams(),[m[41m[m
+                 "Window"                       => $lifetime,[m
+                 "Buffer"                       => [ ],[m
+                 "Action"                       => $list,[m
+                 "Desc"                         => $text,[m
+[31m-                "Aliases"                      => { $context => 1 } };[m
+[31m-[m
+[32m+[m[32m                "Aliases"                      => { $context => 1 } }; # creating context[m[41m[m
+         }[m
+ [m
+     } else {[m
+[36m@@ -5070,7 +5088,7 @@[m [msub execute_set_action {[m
+             if (!exists($context_list{$context}->{"Internal"})) {[m
+ [m
+                 if (defined($lifetime)) {[m
+[31m-                    $context_list{$context}->{"Time"} = time();[m
+[32m+[m[32m                    $context_list{$context}->{"Time"} = getTimeAccordingToSecParams(); # context change[m[41m[m
+                     $context_list{$context}->{"Window"} = $lifetime;[m
+                 }[m
+ [m
+[36m@@ -5177,12 +5195,12 @@[m [msub execute_add_action {[m
+ [m
+     if (!exists($context_list{$context})) {[m
+ [m
+[31m-        $context_list{$context} = { "Time" => time(),[m
+[32m+[m[32m        $context_list{$context} = { "Time" => ($intevents && $event =~ /SEC_\S+/) ? time() : getTimeAccordingToSecParams(),[m[41m[m
+             "Window"                       => 0,[m
+             "Buffer"                       => [ ],[m
+             "Action"                       => [ ],[m
+             "Desc"                         => "",[m
+[31m-            "Aliases"                      => { $context => 1 } };[m
+[32m+[m[32m            "Aliases"                      => { $context => 1 } }; # context adding event[m[41m[m
+     }[m
+ [m
+     if (!exists($context_list{$context}->{"Internal"})) {[m
+[36m@@ -5220,12 +5238,12 @@[m [msub execute_prepend_action {[m
+ [m
+     if (!exists($context_list{$context})) {[m
+ [m
+[31m-        $context_list{$context} = { "Time" => time(),[m
+[32m+[m[32m        $context_list{$context} = { "Time" => getTimeAccordingToSecParams(),[m[41m[m
+             "Window"                       => 0,[m
+             "Buffer"                       => [ ],[m
+             "Action"                       => [ ],[m
+             "Desc"                         => "",[m
+[31m-            "Aliases"                      => { $context => 1 } };[m
+[32m+[m[32m            "Aliases"                      => { $context => 1 } }; # prepending event to context[m[41m[m
+     }[m
+ [m
+     if (!exists($context_list{$context}->{"Internal"})) {[m
+[36m@@ -5263,12 +5281,12 @@[m [msub execute_fill_action {[m
+ [m
+     if (!exists($context_list{$context})) {[m
+ [m
+[31m-        $context_list{$context} = { "Time" => time(),[m
+[32m+[m[32m        $context_list{$context} = { "Time" => getTimeAccordingToSecParams(),[m[41m[m
+             "Window"                       => 0,[m
+             "Buffer"                       => [ ],[m
+             "Action"                       => [ ],[m
+             "Desc"                         => "",[m
+[31m-            "Aliases"                      => { $context => 1 } };[m
+[32m+[m[32m            "Aliases"                      => { $context => 1 } }; # filling context[m[41m[m
+     }[m
+ [m
+     if (!exists($context_list{$context}->{"Internal"})) {[m
+[36m@@ -5575,7 +5593,7 @@[m [msub execute_setctime_action {[m
+             if (!exists($context_list{$context}->{"Internal"})) {[m
+ [m
+                 $time = $context_list{$context}->{"Time"};[m
+[31m-                $time2 = time();[m
+[32m+[m[32m                $time2 = getTimeAccordingToSecParams();[m[41m[m
+ [m
+                 if ($timestamp < $time) {[m
+                     log_msg(LOG_WARN,[m
+[36m@@ -5623,7 +5641,7 @@[m [msub execute_event_action {[m
+         foreach $event (@event) {[m
+             log_msg(LOG_DEBUG, "Scheduling the creation of event '$event' after $createafter seconds");[m
+             push @pending_events, [ time() + $createafter, $event,[m
+[31m-                    SYNEVENT_INT_CONTEXT ];[m
+[32m+[m[32m                    SYNEVENT_INT_CONTEXT ]; # OK action event[m[41m[m
+         }[m
+     } else {[m
+         foreach $event (@event) {[m
+[36m@@ -5656,7 +5674,7 @@[m [msub execute_tevent_action {[m
+             foreach $event (@event) {[m
+                 log_msg(LOG_DEBUG, "Scheduling the creation of event '$event' after $createafter seconds");[m
+                 push @pending_events, [ time() + $createafter, $event,[m
+[31m-                        SYNEVENT_INT_CONTEXT ];[m
+[32m+[m[32m                        SYNEVENT_INT_CONTEXT ]; # OK[m[41m[m
+             }[m
+         } else {[m
+             foreach $event (@event) {[m
+[36m@@ -5696,7 +5714,7 @@[m [msub execute_cevent_action {[m
+             foreach $event (@event) {[m
+                 log_msg(LOG_DEBUG,[m
+                     "Scheduling the creation of event '$event' with context '$context' after $createafter seconds");[m
+[31m-                push @pending_events, [ time() + $createafter, $event, $context ];[m
+[32m+[m[32m                push @pending_events, [ time() + $createafter, $event, $context ];  # OK[m[41m[m
+             }[m
+         } else {[m
+             foreach $event (@event) {[m
+[36m@@ -5816,7 +5834,7 @@[m [msub execute_setwpos_action {[m
+ [m
+             $oper = $corr_list{$key};[m
+             $time = $oper->{"Time"};[m
+[31m-            $time2 = time();[m
+[32m+[m[32m            $time2 = time(); # OK setwpos action[m[41m[m
+ [m
+             if ($timestamp < $time) {[m
+                 log_msg(LOG_WARN,[m
+[36m@@ -6218,8 +6236,8 @@[m [msub valid_context {[m
+ [m
+         if (!$context_list{$context}->{"Window"}) { return 1; }[m
+ [m
+[31m-        if (time() - $context_list{$context}->{"Time"}[m
+[31m-            <= $context_list{$context}->{"Window"}) { return 1; }[m
+[32m+[m[32m        if (getTimeAccordingToSecParams() - $context_list{$context}->{"Time"}[m[41m[m
+[32m+[m[32m            <= $context_list{$context}->{"Window"}) { return 1; } # validate context[m[41m[m
+ [m
+         # if the valid_context was called recursively and action-list-on-expire[m
+         # is currently executing, the context is considered stale and return 0[m
+[36m@@ -7521,7 +7539,7 @@[m [msub process_singlewithsuppress_rule {[m
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }[m
+ [m
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);[m
+[31m-    $time = time();[m
+[32m+[m[32m    $time = getTimeAccordingToSecParams();[m[41m[m
+ [m
+     # if there is no event correlation operation for the key, or[m
+     # the operation with the key has expired, start the new operation[m
+[36m@@ -7565,7 +7583,7 @@[m [msub process_pair_rule {[m
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }[m
+ [m
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);[m
+[31m-    $time = time();[m
+[32m+[m[32m    $time = getTimeAccordingToSecParams();[m[41m[m
+ [m
+     # if there is no event correlation operation for the key, or[m
+     # the operation with the key has expired, start the new operation[m
+[36m@@ -7718,7 +7736,7 @@[m [msub process_pairwithwindow_rule {[m
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }[m
+ [m
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);[m
+[31m-    $time = time();[m
+[32m+[m[32m    $time = getTimeAccordingToSecParams();[m[41m[m
+ [m
+     # if there is an event correlation operation for the key and[m
+     # the operation has expired, execute the first action list and[m
+[36m@@ -7863,6 +7881,119 @@[m [msub process_pairwithwindow_rule {[m
+ [m
+ }[m
+ [m
+[32m+[m[32m################[m[41m[m
+[32m+[m[32m# + Jan Lejnar #[m[41m[m
+[32m+[m[32m################[m[41m[m
+[32m+[m[32m# Action: get time according to sec params, that were defined on startup.[m[41m[m
+[32m+[m[32m# SEC used to use only time() option. It wasn't designed for offline analysis.[m[41m[m
+[32m+[m[32m# The biggest improvement that SEC+ provide is that it allows you to parse event time[m[41m[m
+[32m+[m[32m# directly from log files, furthermore read in the order of this parsed time.[m[41m[m
+[32m+[m[32msub getTimeAccordingToSecParams {[m[41m[m
+[32m+[m[32m    if ($parseEventTime) {[m[41m[m
+[32m+[m[32m        if ($parsedTimeOrder) {[m[41m[m
+[32m+[m[32m            return $inputsrc{$input_sources[$bufpos]}->{"recentTime"};[m[41m[m
+[32m+[m[32m        } else {[m[41m[m
+[32m+[m[32m            return getEventTimeFromProcessingLine($input_buffer[$bufpos], $input_sources[$bufpos]);[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[32m    } else {[m[41m[m
+[32m+[m[32m        return time();[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m################[m[41m[m
+[32m+[m[32m# + Jan Lejnar #[m[41m[m
+[32m+[m[32m################[m[41m[m
+[32m+[m[32m# Parameters: par1 - reference to the fileFormatName[m[41m[m
+[32m+[m[32m# Action: try to find regex that describes, how to parse date of input file of type fileFormatName[m[41m[m
+[32m+[m[32msub searchForRegexInLogFormatsFile {[m[41m[m
+[32m+[m[32m    my $fileFormatName = $_[0];[m[41m[m
+[32m+[m[32m    my $fileFormatRegex;[m[41m[m
+[32m+[m[32m    my $logFormatsFile = DEFAULT_LOGFORMATSFILE;[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if (!open(DATA, "<", $logFormatsFile)) {[m[41m[m
+[32m+[m[32m        log_msg(LOG_DEBUG, "Couldn't open file with logFormats: $logFormatsFile");[m[41m[m
+[32m+[m[32m        die "Couldn't open file with logFormats: $logFormatsFile";[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    my $actFileFormatName;[m[41m[m
+[32m+[m[32m    while(<DATA>) {[m[41m[m
+[32m+[m[32m        #      print "$_";[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m        if ($_ =~ /^(\S+)=(.*)$/) {[m[41m[m
+[32m+[m[32m            $actFileFormatName = $1;[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m            if ($actFileFormatName eq $fileFormatName) {[m[41m[m
+[32m+[m[32m                $fileFormatRegex = $2;[m[41m[m
+[32m+[m[32m                eraseNewLines($fileFormatRegex); # fix if logFormats file has windows endings[m[41m[m
+[32m+[m[32m                last;[m[41m[m
+[32m+[m[32m            }[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if (not defined $fileFormatRegex) {[m[41m[m
+[32m+[m[32m        log_msg(LOG_DEBUG,[m[41m[m
+[32m+[m[32m            "File with logFormats ($logFormatsFile) does not contain entry for this fileFormat ($fileFormatName)");[m[41m[m
+[32m+[m[32m        die "File with logFormats ($logFormatsFile) does not contain entry for this fileFormat ($fileFormatName)"[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    $fileFormatName2Regex{$fileFormatName} = $fileFormatRegex;[m[41m[m
+[32m+[m[32m    return $fileFormatRegex;[m[41m[m
+[32m+[m[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m################[m[41m[m
+[32m+[m[32m# + Jan Lejnar #[m[41m[m
+[32m+[m[32m################[m[41m[m
+[32m+[m[32m# Action: returns parsed event time from actually processing line[m[41m[m
+[32m+[m[32msub getEventTimeFromProcessingLine {[m[41m[m
+[32m+[m[32m    my ($line, $file, $fileFormatName);[m[41m[m
+[32m+[m[32m    $line = $_[0];[m[41m[m
+[32m+[m[32m    $file = $_[1];[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if ($file eq "-") {[m[41m[m
+[32m+[m[32m        log_msg(LOG_DEBUG, "Can't read from standart input when --parseEventTime is set");[m[41m[m
+[32m+[m[32m        die "Can't read from standart input when --parseEventTime is set";[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    $fileFormatName = $inputsrc{$file}->{"context"};[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if (substr($fileFormatName, 0, length(FILEVENT_INT_CONTEXT_PREF)) eq FILEVENT_INT_CONTEXT_PREF) {[m[41m[m
+[32m+[m[32m        log_msg(LOG_DEBUG,[m[41m[m
+[32m+[m[32m            "You have to specify fileFormatName for --input=$file -> append =<FILEFORMATNAME> when --parseEventTime is set");[m[41m[m
+[32m+[m[32m        die "You have to specify fileFormatName for --input=$file -> append =<FILEFORMATNAME> when --parseEventTime is set";[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    my $fileFormatRegex = $fileFormatName2Regex{$fileFormatName};[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if (not defined $fileFormatRegex) {[m[41m[m
+[32m+[m[32m        log_msg(LOG_DEBUG,[m[41m[m
+[32m+[m[32m            "I have to search for $fileFormatName in logFormats file");[m[41m[m
+[32m+[m[32m        $fileFormatRegex = searchForRegexInLogFormatsFile($fileFormatName);[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if ($line !~ /$fileFormatRegex/) {[m[41m[m
+[32m+[m[32m        log_msg(LOG_DEBUG, "Can't match fileFormatRegex to line ($line)");[m[41m[m
+[32m+[m[32m        die "Can't match fileFormatRegex to line ($line)";[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    my $year = $+{year} || ""; # optional => then I assume that the date is the first matching date before current time[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if (!defined($+{month}) || !defined($+{day}) || !defined($+{hour}) || !defined($+{minute}) || !defined($+{second})) {[m[41m[m
+[32m+[m[32m        log_msg(LOG_DEBUG,[m[41m[m
+[32m+[m[32m            "Some mandatory field of date parsing regex were not specifed for log file: ($file)");[m[41m[m
+[32m+[m[32m        die "Some mandatory field of date parsing regex were not specifed for log file: ($file)";[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m    [m
+[32m+[m[32m    my $commonLogFormatStr = "$+{month}/$+{day}/$year:$+{hour}:$+{minute}:$+{second}";[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    my $epoch = str2time($commonLogFormatStr);[m[41m[m
+[32m+[m[32m    if (defined $epoch) {[m[41m[m
+[32m+[m[32m        return $epoch;[m[41m[m
+[32m+[m[32m    } else {[m[41m[m
+[32m+[m[32m        log_msg(LOG_DEBUG,[m[41m[m
+[32m+[m[32m            "Can't get eventTime from date ($commonLogFormatStr)");[m[41m[m
+[32m+[m[32m        die "Can't get eventTime from date ($commonLogFormatStr)"[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[32m}[m[41m[m
+ [m
+ # Parameters: par1 - reference to the rule definition[m
+ #             par2 - reference to the hash of match values[m
+[36m@@ -7878,7 +8009,7 @@[m [msub process_singlewiththreshold_rule {[m
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }[m
+ [m
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);[m
+[31m-    $time = time();[m
+[32m+[m[32m    $time = getTimeAccordingToSecParams();[m[41m[m
+ [m
+     # if there exists event correlation operation for the key and its window[m
+     # has expired, slide the window forward or terminate the operation[m
+[36m@@ -7976,7 +8107,7 @@[m [msub process_singlewith2thresholds_rule {[m
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }[m
+ [m
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);[m
+[31m-    $time = time();[m
+[32m+[m[32m    $time = getTimeAccordingToSecParams();[m[41m[m
+ [m
+     # if there exists event correlation operation for the key and its window[m
+     # has expired, slide the window forward or terminate the operation[m
+[36m@@ -8104,7 +8235,7 @@[m [msub process_eventgroup_rule {[m
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }[m
+ [m
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);[m
+[31m-    $time = time();[m
+[32m+[m[32m    $time = getTimeAccordingToSecParams();[m[41m[m
+ [m
+     # if there exists event correlation operation for the key and its window[m
+     # has expired, slide the window forward or terminate the operation[m
+[36m@@ -8349,8 +8480,7 @@[m [msub match_pair_operations {[m
+             if ($rule->{"Type"} == PAIR) {[m
+ [m
+                 if (!$oper->{"Window"} ||[m
+[31m-                    time() - $oper->{"Time"} <= $oper->{"Window"}) {[m
+[31m-[m
+[32m+[m[32m                    getTimeAccordingToSecParams() - $oper->{"Time"} <= $oper->{"Window"}) {[m[41m[m
+                     $ret = 1;[m
+                     ++$rule->{"MatchCount"};[m
+ [m
+[36m@@ -8703,7 +8833,7 @@[m [msub process_lists {[m
+     if (scalar(@pending_events)) {[m
+ [m
+         @buffer = ();[m
+[31m-        $time = time();[m
+[32m+[m[32m        $time = time(); # OK ? removing obsolete elems[m[41m[m
+ [m
+         foreach $pevt (@pending_events) {[m
+             if ($time >= $pevt->[0]) {[m
+[36m@@ -8728,7 +8858,7 @@[m [msub process_lists {[m
+ [m
+     # process CALENDAR rules[m
+ [m
+[31m-    @time = localtime(time());[m
+[32m+[m[32m    @time = localtime(time()); # OK calendar rule[m[41m[m
+     $minute = $time[1];[m
+     $hour = $time[2];[m
+     $day = $time[3];[m
+[36m@@ -8736,7 +8866,7 @@[m [msub process_lists {[m
+     $year = $time[5];[m
+     $weekday = $time[6];[m
+ [m
+[31m-    $lastdayofmonth = ((localtime(time() + 86400))[3] == 1);[m
+[32m+[m[32m    $lastdayofmonth = ((localtime(time() + 86400))[3] == 1); # OK[m[41m[m
+     $shortyear = $year % 100;[m
+ [m
+     foreach $rule (@calendar) {[m
+[36m@@ -8792,7 +8922,7 @@[m [msub process_lists {[m
+         if (!exists($corr_list{$key})) { next; }[m
+ [m
+         $oper = $corr_list{$key};[m
+[31m-        $time = time();[m
+[32m+[m[32m        $time = getTimeAccordingToSecParams();[m[41m[m
+ [m
+         # if the correlation window has not expired, move to next operation[m
+         if ($time - $oper->{"Time"} <= $oper->{"Window"}) { next; }[m
+[36m@@ -9745,7 +9875,7 @@[m [msub dump_data {[m
+ [m
+     # get the current time[m
+ [m
+[31m-    $time = time();[m
+[32m+[m[32m    $time = time(); # OK debug dump[m[41m[m
+ [m
+     # with --dumpfts command line option, include seconds since epoch[m
+     # in the dump file name as a suffix[m
+[36m@@ -10302,11 +10432,25 @@[m [msub consume_pipe {[m
+ [m
+         } elsif ($ret == 0) { last; }[m
+ [m
+[31m-        # try to read from the pipe[m
+[32m+[m[32m        ################[m[41m[m
+[32m+[m[32m        # + Jan Lejnar #[m[41m[m
+[32m+[m[32m        ################[m[41m[m
+[32m+[m[32m        if ($parseEventTime && $parsedTimeOrder) {[m[41m[m
+[32m+[m[32m            $children{$pid}->{"buffer"} = readline $children{$pid}->{"fh"};[m[41m[m
+[32m+[m[32m            if (!defined($children{$pid}->{"buffer"})) {[m[41m[m
+[32m+[m[32m                $nbytes = 0;[m[41m[m
+[32m+[m[32m            } else {[m[41m[m
+[32m+[m[32m                eraseNewLines($children{$pid}->{"buffer"});[m[41m[m
+[32m+[m[32m                $nbytes = length($children{$pid}->{"buffer"});[m[41m[m
+[32m+[m[32m            }[m[41m[m
+[32m+[m[32m        } else {[m[41m[m
+[32m+[m[32m            # try to read from the pipe[m[41m[m
+ [m
+[31m-        $nbytes = sysread($children{$pid}->{"fh"},[m
+[31m-            $children{$pid}->{"buffer"},[m
+[31m-            $blocksize, length($children{$pid}->{"buffer"}));[m
+[32m+[m[32m            $nbytes = sysread($children{$pid}->{"fh"},[m[41m[m
+[32m+[m[32m                $children{$pid}->{"buffer"},[m[41m[m
+[32m+[m[32m                $blocksize, length($children{$pid}->{"buffer"}));[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[32m        ################[m[41m[m
+ [m
+         # if sysread() failed and the reason was other than a caught signal,[m
+         # close the pipe and quit the read-loop;[m
+[36m@@ -10473,7 +10617,7 @@[m [msub check_tcp_conn {[m
+ [m
+     my ($time, $peer, $win, $ret, $event, $nbytes, $sockok);[m
+ [m
+[31m-    $time = time();[m
+[32m+[m[32m    $time = time(); # OK TCP-connection[m[41m[m
+ [m
+     # communication errors with remote peers are logged at the debug level,[m
+     # in order to prevent message floods with higher severity when large[m
+[36m@@ -10770,7 +10914,7 @@[m [msub open_input {[m
+     # Open the input files[m
+ [m
+     @inputfiles = sort keys %fcont;[m
+[31m-    $time = time();[m
+[32m+[m[32m    $time = time(); # OK opening input files[m[41m[m
+ [m
+     foreach $inputfile (@inputfiles) {[m
+ [m
+[36m@@ -10908,6 +11052,14 @@[m [msub input_shuffled {[m
+ [m
+ }[m
+ [m
+[32m+[m[32m#################[m[41m[m
+[32m+[m[32m# + Jan Lejnar  #[m[41m[m
+[32m+[m[32m#################[m[41m[m
+[32m+[m[32m# Parameters: par - string which should be modified[m[41m[m
+[32m+[m[32m# Action: erases all \r or \n characters from string[m[41m[m
+[32m+[m[32msub eraseNewLines {[m[41m[m
+[32m+[m[32m    $_[0] =~ s/\r|\n//g;[m[41m[m
+[32m+[m[32m}[m[41m[m
+ [m
+ # Parameters: par1 - name of the input file[m
+ # Action: read next line from the input file and return it (without '\n' at[m
+[36m@@ -10932,12 +11084,25 @@[m [msub read_line_from_file {[m
+     }[m
+ [m
+     if ($inputsrc{$file}->{"regfile"}) {[m
+[32m+[m[32m        ################[m[41m[m
+[32m+[m[32m        # + Jan Lejnar #[m[41m[m
+[32m+[m[32m        ################[m[41m[m
+[32m+[m[32m        if ($parseEventTime && $parsedTimeOrder) {[m[41m[m
+[32m+[m[32m            $inputsrc{$file}->{"buffer"} = readline $inputsrc{$file}->{"fh"};[m[41m[m
+[32m+[m[32m            if (!defined($inputsrc{$file}->{"buffer"})) {[m[41m[m
+[32m+[m[32m                $nbytes = 0;[m[41m[m
+[32m+[m[32m            } else {[m[41m[m
+[32m+[m[32m                eraseNewLines($inputsrc{$file}->{"buffer"});[m[41m[m
+[32m+[m[32m                $nbytes = length($inputsrc{$file}->{"buffer"});[m[41m[m
+[32m+[m[32m            }[m[41m[m
+[32m+[m[32m        } else {[m[41m[m
+[32m+[m[32m            # try to read data from a regular file[m[41m[m
+ [m
+[31m-        # try to read data from a regular file[m
+[31m-[m
+[31m-        $nbytes = sysread($inputsrc{$file}->{"fh"},[m
+[31m-            $inputsrc{$file}->{"buffer"},[m
+[31m-            $blocksize, length($inputsrc{$file}->{"buffer"}));[m
+[32m+[m[32m            $nbytes = sysread($inputsrc{$file}->{"fh"},[m[41m[m
+[32m+[m[32m                $inputsrc{$file}->{"buffer"},[m[41m[m
+[32m+[m[32m                $blocksize, length($inputsrc{$file}->{"buffer"}));[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[32m        ################[m[41m[m
+ [m
+         # check the exit value from sysread() that was saved to $nbytes:[m
+         # if $nbytes == undef, sysread() failed;[m
+[36m@@ -11006,12 +11171,25 @@[m [msub read_line_from_file {[m
+             return undef;[m
+ [m
+         } elsif ($ret == 0) { return undef; }[m
+[32m+[m[32m        ################[m[41m[m
+[32m+[m[32m        # + Jan Lejnar #[m[41m[m
+[32m+[m[32m        ################[m[41m[m
+[32m+[m[32m        if ($parseEventTime && $parsedTimeOrder) {[m[41m[m
+[32m+[m[32m            $inputsrc{$file}->{"buffer"} = readline $inputsrc{$file}->{"fh"};[m[41m[m
+[32m+[m[32m            if (!defined($inputsrc{$file}->{"buffer"})) {[m[41m[m
+[32m+[m[32m                $nbytes = 0;[m[41m[m
+[32m+[m[32m            } else {[m[41m[m
+[32m+[m[32m                eraseNewLines($inputsrc{$file}->{"buffer"});[m[41m[m
+[32m+[m[32m                $nbytes = length($inputsrc{$file}->{"buffer"});[m[41m[m
+[32m+[m[32m            }[m[41m[m
+[32m+[m[32m        } else {[m[41m[m
+[32m+[m[32m            # try to read from the pipe[m[41m[m
+ [m
+[31m-        # try to read from the pipe[m
+[31m-[m
+[31m-        $nbytes = sysread($inputsrc{$file}->{"fh"},[m
+[31m-            $inputsrc{$file}->{"buffer"},[m
+[31m-            $blocksize, length($inputsrc{$file}->{"buffer"}));[m
+[32m+[m[32m            $nbytes = sysread($inputsrc{$file}->{"fh"},[m[41m[m
+[32m+[m[32m                $inputsrc{$file}->{"buffer"},[m[41m[m
+[32m+[m[32m                $blocksize, length($inputsrc{$file}->{"buffer"}));[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[32m        ################[m[41m[m
+ [m
+         # check the exit value from sysread() that was saved to $nbytes:[m
+         # if $nbytes == undef, sysread() failed;[m
+[36m@@ -11064,7 +11242,7 @@[m [msub read_line_from_file {[m
+                     $inputsrc{$file}->{"regfile"}) = open_input_file($file, - 1);[m
+ [m
+                 $inputsrc{$file}->{"open"} = defined($inputsrc{$file}->{"fh"});[m
+[31m-                if ($reopen_timeout) { $inputsrc{$file}->{"lastopen"} = time(); }[m
+[32m+[m[32m                if ($reopen_timeout) { $inputsrc{$file}->{"lastopen"} = time(); } # OK reopening the pipe[m[41m[m
+ [m
+             }[m
+ [m
+[36m@@ -11077,22 +11255,136 @@[m [msub read_line_from_file {[m
+ [m
+     }[m
+ [m
+[31m-    # if the read buffer contains a newline, cut the first line from the[m
+[31m-    # read buffer and return it, otherwise return undef (even if there are[m
+[31m-    # some bytes in the buffer)[m
+[32m+[m[32m    ################[m[41m[m
+[32m+[m[32m    # + Jan Lejnar #[m[41m[m
+[32m+[m[32m    ################[m[41m[m
+[32m+[m[32m    if ($parseEventTime && $parsedTimeOrder) {[m[41m[m
+[32m+[m[32m        $line = $inputsrc{$file}->{"buffer"};[m[41m[m
+[32m+[m[32m        return $line;[m[41m[m
+[32m+[m[32m    } else {[m[41m[m
+[32m+[m[32m        # if the read buffer contains a newline, cut the first line from the[m[41m[m
+[32m+[m[32m        # read buffer and return it, otherwise return undef (even if there are[m[41m[m
+[32m+[m[32m        # some bytes in the buffer)[m[41m[m
+ [m
+[31m-    $pos = index($inputsrc{$file}->{"buffer"}, "\n");[m
+[32m+[m[32m        $pos = index($inputsrc{$file}->{"buffer"}, "\n");[m[41m[m
+ [m
+[31m-    if ($pos != - 1) {[m
+[31m-        $line = substr($inputsrc{$file}->{"buffer"}, 0, $pos);[m
+[31m-        substr($inputsrc{$file}->{"buffer"}, 0, $pos + 1) = "";[m
+[31m-        return $line;[m
+[32m+[m[32m        if ($pos != - 1) {[m[41m[m
+[32m+[m[32m            $line = substr($inputsrc{$file}->{"buffer"}, 0, $pos);[m[41m[m
+[32m+[m[32m            substr($inputsrc{$file}->{"buffer"}, 0, $pos + 1) = "";[m[41m[m
+[32m+[m[32m            return $line;[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m        return undef;[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m################[m[41m[m
+[32m+[m[32m# + Jan Lejnar #[m[41m[m
+[32m+[m[32m################[m[41m[m
+[32m+[m[32m# Parameters: par1 - event time to check[m[41m[m
+[32m+[m[32m# Action: if one of timeFilters is active, or both, check if event time is in range[m[41m[m
+[32m+[m[32msub checkEventTimeBounds {[m[41m[m
+[32m+[m[32m    my $eventTime = $_[0];[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if (defined($timeFilterFrom)) {[m[41m[m
+[32m+[m[32m        if ($eventTime < $timeFilterFrom) {[m[41m[m
+[32m+[m[32m            return 0; # false[m[41m[m
+[32m+[m[32m        }[m[41m[m
+     }[m
+ [m
+[31m-    return undef;[m
+[32m+[m[32m    if (defined($timeFilterTo)) {[m[41m[m
+[32m+[m[32m        if ($eventTime > $timeFilterTo) {[m[41m[m
+[32m+[m[32m            return 0; # false[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[32m    }[m[41m[m
+ [m
+[32m+[m[32m    return 1; # true[m[41m[m
+ }[m
+ [m
+[32m+[m[32m################[m[41m[m
+[32m+[m[32m# + Jan Lejnar #[m[41m[m
+[32m+[m[32m################[m[41m[m
+[32m+[m[32m# Action: fills @readbuffer[0] with line, that came the most recently of all front lines of input files[m[41m[m
+[32m+[m[32m# @readbuffer[1] will contain the file name, where line is[m[41m[m
+[32m+[m[32m# @readbuffer[2] will contain the parsed event time, in order to provide more efficiency[m[41m[m
+[32m+[m[32m# this modified version of read_line() won't save any more events into @readbuffer and will read lines from input files, not fixed ammount of blocksize[m[41m[m
+[32m+[m[32msub readRecentLineToReadbuffer {[m[41m[m
+[32m+[m[32m    my ($line, $file, $time, $eventTime);[m[41m[m
+[32m+[m[32m    my ($mostRecentTime, $fileWithMostRecentTime);[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    # check all input files and store new data to the read buffer[m[41m[m
+[32m+[m[32m    #$newdata = 0;[m[41m[m
+[32m+[m[32m    $time = time();[m[41m[m
+[32m+[m[32m    my $eventTimeInBounds;[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    foreach $file (@inputfiles) {[m[41m[m
+[32m+[m[32m        if ($inputsrc{$file}->{"open"}) {[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m            $eventTimeInBounds = 0;[m[41m[m
+[32m+[m[32m            if (($inputsrc{$file}->{"buffer"}) eq "") {[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m                while ($inputsrc{$file}->{"open"} && !$eventTimeInBounds) {[m[41m[m
+[32m+[m[32m                    $line = read_line_from_file($file);[m[41m[m
+[32m+[m[32m                    if (defined($line)) {[m[41m[m
+[32m+[m[32m                        $eventTime = getEventTimeFromProcessingLine($line, $file);[m[41m[m
+[32m+[m[32m                        $inputsrc{$file}->{"recentTime"} = $eventTime;[m[41m[m
+[32m+[m[32m                        $eventTimeInBounds = checkEventTimeBounds($eventTime);[m[41m[m
+[32m+[m[32m                    }[m[41m[m
+[32m+[m[32m                }[m[41m[m
+[32m+[m[32m                if (!defined($line)) {[m[41m[m
+[32m+[m[32m                    next;[m[41m[m
+[32m+[m[32m                }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m            } else {[m[41m[m
+[32m+[m[32m                $eventTime = $inputsrc{$file}->{"recentTime"};[m[41m[m
+[32m+[m[32m            }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m            if (!defined($mostRecentTime)) {[m[41m[m
+[32m+[m[32m                $mostRecentTime = $eventTime;[m[41m[m
+[32m+[m[32m                $fileWithMostRecentTime = $file;[m[41m[m
+[32m+[m[32m            } elsif ($eventTime < $mostRecentTime) {[m[41m[m
+[32m+[m[32m                $mostRecentTime = $eventTime;[m[41m[m
+[32m+[m[32m                $fileWithMostRecentTime = $file;[m[41m[m
+[32m+[m[32m            }[m[41m[m
+[32m+[m[32m        } else { # this file is closed - all lines was read[m[41m[m
+[32m+[m[32m            $inputsrc{$file}->{"buffer"} = undef;[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if (!defined($fileWithMostRecentTime)) {[m[41m[m
+[32m+[m[32m        $line = undef;[m[41m[m
+[32m+[m[32m    } else {[m[41m[m
+[32m+[m[32m        $file = $fileWithMostRecentTime;[m[41m[m
+[32m+[m[32m        $line = $inputsrc{$file}->{"buffer"};[m[41m[m
+[32m+[m[32m        $inputsrc{$file}->{"buffer"} = "";[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if (defined($line)) {[m[41m[m
+[32m+[m[32m        # if we received a new line, write the line to the read buffer; also[m[41m[m
+[32m+[m[32m        # update time-related variables and call external script, if necessary[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m        push @readbuffer, $line, $file;[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m        if ($input_timeout) {[m[41m[m
+[32m+[m[32m            $inputsrc{$file}->{"lastread"} = $time;[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m        if ($inputsrc{$file}->{"scriptexec"}) {[m[41m[m
+[32m+[m[32m            log_msg(LOG_INFO,[m[41m[m
+[32m+[m[32m                "Input received, executing script $timeout_script 0 $file");[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m            shell_cmd("$timeout_script 0 $file");[m[41m[m
+[32m+[m[32m            $inputsrc{$file}->{"scriptexec"} = 0;[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[32m    } else {[m[41m[m
+[32m+[m[32m        push @readbuffer, undef, undef; # every lines from every files was read[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    # force rest of code to work properly: to ignore info from this method and proceede to get $line and $file from @readbuffer[m[41m[m
+[32m+[m[32m    $_[0] = undef;[m[41m[m
+[32m+[m[32m    $_[1] = "undef"; # to don't jump into condition if (!$file) later..[m[41m[m
+[32m+[m[32m}[m[41m[m
+[32m+[m[32m################[m[41m[m
+ [m
+ # Parameters: par1 - variable where the input line is saved[m
+ #             par2 - variable where the input file name is saved[m
+[36m@@ -11356,7 +11648,7 @@[m [msub check_signals {[m
+         # since all action list variables have been dropped, re-create builtin[m
+         # action list variables for the current second and special characters[m
+ [m
+[31m-        $timevar_update = time();[m
+[32m+[m[32m        $timevar_update = time(); # OK ?[m[41m[m
+         set_actionlist_time_var($timevar_update);[m
+         set_actionlist_char_var();[m
+ [m
+[36m@@ -12104,6 +12396,14 @@[m [msub read_options {[m
+     $testonly = 0;[m
+     $help = 0;[m
+     $version = 0;[m
+[32m+[m[32m    ################[m[41m[m
+[32m+[m[32m    # + Jan Lejnar #[m[41m[m
+[32m+[m[32m    ################[m[41m[m
+[32m+[m[32m    $parseEventTime = 0;[m[41m[m
+[32m+[m[32m    $parsedTimeOrder = 0;[m[41m[m
+[32m+[m[32m    $dontParseEventTime = 0;[m[41m[m
+[32m+[m[32m    $timeFilterFrom = undef;[m[41m[m
+[32m+[m[32m    $timeFilterTo = undef;[m[41m[m
+ [m
+     # parse the options given in command line and in SEC resource file[m
+     # (GetOptions() prints parsing error messages to standard error)[m
+[36m@@ -12141,7 +12441,15 @@[m [msub read_options {[m
+         "intcontexts!"                    => \$intcontexts,[m
+         "testonly!"                       => \$testonly,[m
+         "help|?"                          => \$help,[m
+[31m-        "version"                         => \$version );[m
+[32m+[m[32m        "version"                         => \$version,[m[41m[m
+[32m+[m[32m        ################[m[41m[m
+[32m+[m[32m        # + Jan Lejnar #[m[41m[m
+[32m+[m[32m        ################[m[41m[m
+[32m+[m[32m        "parseEventTime"                  => \$parseEventTime,[m[41m[m
+[32m+[m[32m        "parsedTimeOrder"                 => \$parsedTimeOrder,[m[41m[m
+[32m+[m[32m        "dontParseEventTime"              => \$dontParseEventTime,[m[41m[m
+[32m+[m[32m        "timeFilterFrom=s"                => \$timeFilterFrom,[m[41m[m
+[32m+[m[32m        "timeFilterTo=s"                  => \$timeFilterTo);[m[41m[m
+ [m
+     # check the values received from command line and resource file[m
+     # and set option variables back to defaults, if necessary[m
+[36m@@ -12263,6 +12571,42 @@[m [msub read_options {[m
+         $umask = undef;[m
+     }[m
+ [m
+[32m+[m[32m    ################[m[41m[m
+[32m+[m[32m    # + Jan Lejnar #[m[41m[m
+[32m+[m[32m    ################[m[41m[m
+[32m+[m[32m    if ($parsedTimeOrder && !$parseEventTime) {[m[41m[m
+[32m+[m[32m        print STDERR "'--parsedTimeOrder' parameter can be used only in combination with --parseEventTime\n";[m[41m[m
+[32m+[m[32m        $parsedTimeOrder = undef;[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if (defined($timeFilterFrom)) {[m[41m[m
+[32m+[m[32m        $timeFilterFrom = str2time($timeFilterFrom);[m[41m[m
+[32m+[m[32m        if (!defined($timeFilterFrom)) {[m[41m[m
+[32m+[m[32m            print STDERR "'--timeFilterFrom' parameter has wrong date format, for more information look into help\n";[m[41m[m
+[32m+[m[32m            $timeFilterFrom = undef;[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if (defined($timeFilterTo)) {[m[41m[m
+[32m+[m[32m        $timeFilterTo = str2time($timeFilterTo);[m[41m[m
+[32m+[m[32m        if (!defined($timeFilterTo)) {[m[41m[m
+[32m+[m[32m            print STDERR "'--timeFilterTo' parameter has wrong date format, for more information look into help\n";[m[41m[m
+[32m+[m[32m            $timeFilterTo = undef;[m[41m[m
+[32m+[m[32m        }[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if ((defined($timeFilterFrom) || defined($timeFilterTo)) && !($parsedTimeOrder && $parseEventTime)) {[m[41m[m
+[32m+[m[32m        print STDERR "Error, time filters can be at the moment used only in combination with --parsedTimeOrder (plus with --parseEventTime)\n";[m[41m[m
+[32m+[m[32m        $timeFilterFrom = undef;[m[41m[m
+[32m+[m[32m        $timeFilterTo = undef;[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32m    if ($dontParseEventTime) {[m[41m[m
+[32m+[m[32m        $parseEventTime = 0;[m[41m[m
+[32m+[m[32m        $parsedTimeOrder = 0;[m[41m[m
+[32m+[m[32m    }[m[41m[m
+[32m+[m[32m    ################[m[41m[m
+[32m+[m[41m[m
+     # in the case of --bufsize=1, always enable the --jointbuf option,[m
+     # since there is no need to maintain multiple input buffers[m
+ [m
+[36m@@ -12311,7 +12655,15 @@[m [msub main_loop {[m
+             $line = shift @readbuffer;[m
+             $file = shift @readbuffer;[m
+         } else {[m
+[31m-            read_line($line, $file);[m
+[32m+[m[32m            ################[m[41m[m
+[32m+[m[32m            # + Jan Lejnar #[m[41m[m
+[32m+[m[32m            ################[m[41m[m
+[32m+[m[32m            if ($parseEventTime && $parsedTimeOrder) {[m[41m[m
+[32m+[m[32m                readRecentLineToReadbuffer($line, $file);[m[41m[m
+[32m+[m[32m            } else {[m[41m[m
+[32m+[m[32m                read_line($line, $file);[m[41m[m
+[32m+[m[32m            }[m[41m[m
+[32m+[m[32m            ################[m[41m[m
+         }[m
+ [m
+         if (defined($line)) {[m
+[36m@@ -12390,8 +12742,9 @@[m [msub main_loop {[m
+         # search lists for accomplishing timed tasks and removing obsolete elements[m
+ [m
+         if (time() - $lastcleanuptime >= $cleantime) {[m
+[32m+[m[32m            # OK[m[41m[m
+             process_lists();[m
+[31m-            $lastcleanuptime = time();[m
+[32m+[m[32m            $lastcleanuptime = time(); # OK[m[41m[m
+         }[m
+ [m
+         # check signal flags[m
+[36m@@ -12619,7 +12972,7 @@[m [m$int_context = { "Time" => time(),[m
+     "Action"            => [ ],[m
+     "Desc"              => "SEC internal",[m
+     "Internal"          => 1,[m
+[31m-    "Aliases"           => { } };[m
+[32m+[m[32m    "Aliases"           => { } }; # OK creating of internal context?[m[41m[m
+ [m
+ ### ignore SIGPIPE (done before generating any output)[m
+ [m
+[36m@@ -12733,7 +13086,7 @@[m [m$SIG{TERM} = \&term_handler;[m
+ [m
+ ### Set various global variables[m
+ [m
+[31m-$startuptime = time();[m
+[32m+[m[32m$startuptime = time(); # OK[m[41m[m
+ $processedlines = 0;[m
+ [m
+ ### Initialize input buffers[m
+[36m@@ -12754,7 +13107,7 @@[m [marrange_input_buffers();[m
+ [m
+ ### Initialize builtin action list variables[m
+ [m
+[31m-$timevar_update = time();[m
+[32m+[m[32m$timevar_update = time(); # OK[m[41m[m
+ set_actionlist_time_var($timevar_update);[m
+ set_actionlist_char_var();[m
+ [m
+[36m@@ -12766,7 +13119,7 @@[m [mif ($intevents) { internal_event("SEC_STARTUP"); }[m
+ ### (triggers Calendar rules, must be done between SEC_STARTUP and main loop)[m
+ [m
+ process_lists();[m
+[31m-$lastcleanuptime = time();[m
+[32m+[m[32m$lastcleanuptime = time(); # OK[m[41m[m
+ [m
+ ### read lines from input stream and process them[m
+ [m

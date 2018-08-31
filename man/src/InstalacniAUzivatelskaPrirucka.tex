@@ -1,0 +1,229 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage[czech]{babel}
+\usepackage[unicode]{hyperref}
+\usepackage{epstopdf}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{float}
+\lstset{language=R}
+\lstset{
+    inputencoding=utf8,
+    extendedchars=true,
+   literate=%
+    {á}{{\'a}}1
+    {č}{{\v{c}}}1
+    {ď}{{\v{d}}}1
+    {é}{{\'e}}1
+    {ě}{{\v{e}}}1
+    {í}{{\'i}}1
+    {ň}{{\v{n}}}1
+    {ó}{{\'o}}1
+    {ř}{{\v{r}}}1
+    {š}{{\v{s}}}1
+    {ť}{{\v{t}}}1
+    {ú}{{\'u}}1
+    {ů}{{\r{u}}}1
+    {ý}{{\'y}}1
+    {ž}{{\v{z}}}1
+    {Á}{{\'A}}1
+    {Č}{{\v{C}}}1
+    {Ď}{{\v{D}}}1
+    {É}{{\'E}}1
+    {Ě}{{\v{E}}}1
+    {Í}{{\'I}}1
+    {Ň}{{\v{N}}}1
+    {Ó}{{\'O}}1
+    {Ř}{{\v{R}}}1
+    {Š}{{\v{S}}}1
+    {Ť}{{\v{T}}}1
+    {Ú}{{\'U}}1
+    {Ů}{{\r{U}}}1
+    {Ý}{{\'Y}}1
+    {Ž}{{\v{Z}}}1
+}
+
+\begin{document}
+
+\begin{titlepage}
+	\centering
+	\includegraphics[width=0.4\textwidth]{cvut-logo-bw}\par\vspace{1cm}
+	{\scshape\LARGE České vysoké učení technické \par}
+	\vspace{1cm}
+	{\scshape\Large Fakulta informačních technologií\par}
+	\vspace{1.5cm}
+	{\huge\bfseries Forensic Analyzer\par} 
+	\vspace{1.5cm}
+	{\huge Instalační a uživatelská příručka \par}
+	\vspace{2cm}
+	
+	{Jan Lejnar \par}
+	\vfill
+	
+	% Bottom of the page
+	{\large \today\par}
+\end{titlepage}
+	
+\tableofcontents
+\newpage	
+
+\section{Instalační příručka}
+\subsection{Požadavky}
+Aplikace \textit{Forensic Analyzer} je určená pro operační systém Linux. Pro úspěšnou instalaci je potřeba mít nainstalované tyto balíčky:
+\begin{itemize}
+	\item make
+	\item g++
+	\item qt-sdk
+	\item doxygen
+	\item graphviz
+\end{itemize}
+
+Balíček instalujte příkazem: \texttt{sudo apt-get install <název balíčku>}
+
+\subsection{Instalace}
+Pro instalaci otevřete příkazový řádek v~adresáři se souborem \texttt{Makefile } a zadejte příkaz \texttt{make}.
+Součástí instalace je také snaha přiřadit práva na spouštění přidružené aplikace SEC+ s~relativní adresou \texttt{./res/sec+}. Tento soubor, prosím, nemažte ani jej nepřesouvejte na jiné umístění.
+
+\subsection{Možnosti Makefilu}
+\label{makefile}
+\texttt{Makefile} má definováno více zajímavých návěští, které můžete připsat za \texttt{make}:
+\begin{itemize}
+	\item all -- Výchozí návěští, pokud není explitně specifikováno jinak. Nainstaluje aplikaci a vygeneruje programátorskou příručku.
+	\item run -- Spustí aplikaci. Při spuštění již nejsou potřeba administrátorská práva.
+	\item doc -- Vygeneruje programátorskou příručku do složky \texttt{doc}. Pro spuštění HTML verze příručky otevřete soubor \texttt{doc/index.html}.
+	\item count -- Počítá počet řádků kódu všech souborů s~příponami \texttt{.h} a \texttt{.cpp}
+	\item clean -- Odinstaluje aplikaci a odstraní programátorskou příručku.
+\end{itemize}
+
+Př.:
+Pouze pro vygenerování programátorské příručky zadejte: \texttt{make doc}
+
+\section{Uživatelská příručka}
+\subsection{Hlavní obrazovka}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/HlavniObrazovka.eps}
+  \caption{Hlavní okno aplikace}
+  \label{fig:HlavniOkno}
+\end{figure}
+
+Po spuštění \textit{Forensic Analyzeru} se dostanete na hlavní obrazovku, viz \ref{fig:HlavniOkno}.
+
+Tato hlavní obrazovka je rozdělena na dvě části:
+\begin{enumerate}
+	\item Část s~parametry, které definují, jak bude forenzní analýza probíhat.
+	\item Okno pro zobrazení výsledků, ať už čistě pro zobrazení nalezených korelací nebo detailnější záznam průběhu analýzy.
+\end{enumerate}
+
+Až budete mít všechny parametry specifikované, stiskněte tlačítko \texttt{START ANALYZING}, popřípadě klávesovou zkratku \texttt{Ctrl + R}. Následně proběhne forenzní analýza zadaných logů dle definovaných konfiguračních souborů. Po dokončení analýzy se objeví výsledky a informace o~době běhu.
+
+\subsubsection{Parametry Forensic Analyzeru}
+Parametry jsou logicky rozdělené do 4 kategorií:
+\begin{enumerate}
+	\item Parametry popisující jaké jsou vstupní logovací soubory, ve kterých se budou podezřelé aktivity hledat.
+	\item Parametry popisující z~jakých konfiguračních souborů se bude vytvářet sada pravidel, která definuje podezřelé aktivity.
+	\item Fixní parametry, což jsou přednastavené parametry, které zaručují správnou funkcionalitu pro offline analýzu logů.
+	\item Volitelné parametry, které slouží pro pokročilé uživatele se znalostmi další parametrizace aplikace SEC, které zde lze uplatnit. 
+\end{enumerate}
+
+Můžete si všimnout, že parametry z~kategorie 1--3 jsou šedé. To značí, že je nelze ručně editovat. Generují se automaticky dle aktuálního stavu aplikace.
+
+Parametry z~kategorie 4 je možné editovat. Lze použít veškeré parametry příkazové řádky, které podporuje nástroj SEC -- viz \cite{secProgram, secManPage}. Ve výchozím nastavení je nastaven parametr \texttt{$--$intvents}, který vynutí generování interních událostí SEC, kterých lze také využívat při psaní pravidel v~konfiguračních souborech.
+
+\subsubsection{Menu lišta a panel nástrojů}
+Panel nástrojů poskytuje rychlejší přístup k~některým prvkům menu lišty. Tento panel nástrojů není fixní a lze jej přemístit na jiný okraj aplikace. Většina operací, které zde nebo v~menu najdete, má přiřazené alternativní klávesové zkratky, které mohou zrychlit používání aplikace.
+
+V~menu se nachází možnost specifikovat časové filtry, které umožní definovat interval, ve kterém chcete hledat podezřelé aktivity a jejich korelace. Události mimo tento interval budou ignorovány.
+Pomocí kalendáře lze specifikovat horní nebo dolní mez, popřípadě obě současně.
+
+Další položkou je volba podrobnosti výpisu. Čím vyšší úroveň, tím více informací o~průběhu analýzy bude zobrazeno. Výchozím nastavením je úroveň 3. Úroveň 1 zobrazuje pouze nalezené podezřelé aktivity a druhým extrémem je úroveň 6, která detailně popisuje všechny důležité momenty analýzy.
+
+Jak podrobnost výpisu, tak časové filtry se připisují do parametrů kategorie 3. Pokud budete chtít přidávat parametry kategorie 4 může být praktické si zobrazit veškerou dostupnou parametrizaci SEC+ (například pomocí klávesové zkratky \texttt{Ctrl + U}).
+
+Zbývají 2 nejdůležitější položky menu, které si rozebereme podrobněji.
+
+\subsection{Správa vstupních logovacích souborů}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/DialogVstupniSoubor.eps}
+  \caption{Dialog se vstupním logovacím souborem}
+  \label{fig:DialogVstupniSoubor}
+\end{figure}
+
+V~první záložce na hlavním okně naleznete přehled aktivních a neaktivních vstupních logů. Aktivní logy jsou zaškrtnuté a tedy se také nachází v~parametrech kategorie 1. První tři akce tohoto menu jsou vyhrazené pro možnost přidat, editovat nebo smazat vstupní log. Akce smazat log (popřípadě konfigurační soubor) pouze odstraní evidenci tohoto souboru z~aplikace, neprovádí fyzické smazání z~disku.
+
+Pokud zvolíte akci přidat log, zobrazí se vám dialog, ve kterém vyberte logovací soubor, který budete chtít zkoumat. Následovat bude dialog z~obrázku \ref{fig:DialogVstupniSoubor}, ve kterém je potřeba doplnit potřebné informace o~logovacím souboru.
+
+\subsubsection{Aliasy}
+Největší část je věnována pro uživatelem definované aliasy, které slouží k zjednodušení a zvýšení přehlednosti zápisu regulárních výrazů. 
+
+Alias se definuje zápisem \texttt{\$\{<jmémo proměnné>\}=<hodnota>}. Vyhodnocování probíhá rekurzivně, dokud \texttt{<hodnota>} není obyčejný řetězec.
+\newpage
+
+\begin{lstlisting}[frame=single,caption=Příklad definice tří aliasů, label=aliasExample]
+${SECOND}=(?<second>([0-5]?[0-9]|60)([:.,][0-9]+)?)
+${MINUTE}=(?<minute>[0-5][0-9])
+${TIME}=(?<hour>2[0123]|[01]?[0-9]):${MINUTE}:${SECOND}
+\end{lstlisting}
+
+\subsubsection{Popis data a času}
+\label{namedCaptureGroups}
+Je nutné specifikovat regulární výraz, podle kterého bude možné z~každé události získat datum a čas. Tento regulární výraz navíc musí obsahovat tzv. \textit{named capture groups}. \cite{namedCaptureGroups}
+
+Vyžaduji specifikovat přesně tyto skupiny:
+\begin{itemize}
+	\item year\footnote{Tato skupina je nepovinná.}
+	\item month
+	\item day
+	\item hour
+	\item minute
+	\item second
+\end{itemize}
+
+Každá skupina musí být obalena zleva \texttt{?<} a zprava \texttt{>}.
+
+\begin{lstlisting}[frame=single,caption=Příklad regulárního výrazu získávájící datum a čas z~události, label=regExpExample]
+(?<month>(0?[1-9]|1[0-2]))\s+(?<day>[1-9]|0[1-9]|
+[12]\d|3[01])\s+(?<hour>2[0123]|[01]?[0-9]):(?<minute>
+[0-5][0-9]):(?<second>([0-5]?[0-9]|60)([:.,][0-9]+)?)
+\end{lstlisting}
+
+Pokud bude skupina pojmenovaná například \texttt{month}, aplikace očekává, že v~této skupině nalezne údaj o~tom, jaký je právě měsíc. Nemusí to být ovšem jen číselná informace. Validní je také například \uv{Jan} nebo \uv{January}. 
+
+Pojmenovaná skupina \texttt{year} je jediná nepovinná, protože některé logy zkrátka rok neevidují. Pokud tato informace není dostupná, aplikace vezme nejpravděpodobnější rok dle dnešního data. Pokud je například 16. dubna 2017 a bude analyzován log, ve kterém je měsíc specifikován jako \uv{Nov}, pak aplikace vyhodnotí, že se jedná o~listopad roku 2016, ne roku 2017.
+
+Lze zde využít výše zmíněné aliasy.
+
+\subsubsection{Formát logu}
+V~horní části okna se nachází další dvě pole. V~prvním je absolutní cesta k~právě spravovanému souboru. V~druhém poli je generovaný název formátu logu, pro který se automaticky vytváří alias \texttt{\$\{<název formátu>\}=<zadaný vstup od uživatele>}, který bude možné použít později pro jiný logovací soubor stejného formátu.
+
+\subsubsection{Uložení změn a ukončení}
+Uložení změn v~tomto okně se provede příslušným tlačítkem \texttt{SAVE ALL + CLOSE}, případně klávesovou zkratkou \texttt{Ctrl + S}. Pokud okno zavřete křížkem v~pravém horním rohu, změny nebudou uloženy.
+
+Nově přidaný log je automaticky považován za aktivní.
+
+\subsection{Správa konfiguračních souborů}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/DialogKonfiguracniSoubor.eps}
+  \caption{Dialog s~konfiguračním souborem}
+  \label{fig:DialogKonfiguracniSoubor}
+\end{figure}
+
+Logika správy konfiguračních souborů je velice podobná správě vstupních logovacích souborů. Zmíním tedy jen odlišnosti.
+
+Na obrázku \ref{fig:DialogKonfiguracniSoubor} je zachycen dialog po výběru konfiguračního souboru.
+Vpravo naleznete opět seznam aliasů. Tyto aliasy jsou oddělené od předchozích a lze je uplatnit v~levé části, která zobrazuje obsah daného konfiguračního souboru.
+
+\subsubsection{Pravidla z~konfiguračního souboru}
+Jednotlivá pravidla musí být oddělena minimálně jedním prázdným řádkem. Pravidla mohou být různých typů, viz \cite{secManPage}. Lze si zvolit typ pravidla, které chcete přidat, a kliknout na tlačítko \texttt{Generate}, popřípadě stisknout klávesovou zkratku \texttt{Ctrl + G}. Takto je možné vygenerovat všechny povinné položky, které dané pravidlo vyžaduje specifikovat. 
+
+Můžete si všimnout, že je automaticky generována akce \uv{\texttt{write -}}\footnote{Spojovník (\texttt{-}) je zkratka pro standardní výstup. \\Akce \texttt{write} má signaturu: \texttt{write <soubor> [<obsah>]}. Podrobněji zde \cite{secManPage}.}. Tuto akci nemažte, jinak hledanou podezřelou aktivitu program sice nalezne, ale v~přehledu ji nezobrazí. Je možné přidávat více akcí, stačí je oddělovat středníkem.
+
+\subsection{Zálohovací soubory}
+Aplikace si i po vypnutí pamatuje mnoho informací z~předchozího běhu a automaticky je načítá při spuštění. Jedná se například o~seznam definovaných logovacích a konfiguračních souborů nebo seznam definovaných aliasů. Tato evidence je uložena v~zálohovacích souborech ve složce \texttt{backup}. \\Pokud chcete rychle získat čistou verzi \textit{Forensic Analyzeru}, můžete celou tuto složku smazat. Aplikace je ovšem dodána s~přednastavenými aliasy, které by byla  škoda nevyužít.
+
+\end{document}

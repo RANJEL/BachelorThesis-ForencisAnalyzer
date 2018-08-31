@@ -1,0 +1,18 @@
+Oct 30 05:56:20 locust sshd[13045]: Failed password for root from 84.140.169.13 port 60763 ssh2
+Oct 30 05:56:20 locust sshd[13045]: Received disconnect from 84.140.169.13: 11: Bye Bye [preauth]
+Nov  3 08:23:50 locust sshd[24267]: Address 187.32.49.100 maps to dedicabrasil.com.br, but this does not map back to the address - POSSIBLE BREAK-IN ATTEMPT!
+Nov  3 08:23:50 locust sshd[24267]: pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=187.32.49.100  user=root
+Nov  3 08:23:53 locust sshd[24267]: Failed password for root from 187.32.49.100 port 35854 ssh2
+Nov  3 08:23:53 locust sshd[24267]: Received disconnect from 187.32.49.100: 11: Bye Bye [preauth]
+Nov  3 10:44:45 locust sshd[6905]: pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.229.172.76  user=root
+Nov  3 10:44:47 locust sshd[6905]: Failed password for root from 221.229.172.76 port 60763 ssh2
+Nov  3 10:44:49 locust sshd[6905]: Failed password for root from 221.229.172.76 port 60763 ssh2
+Nov  3 10:45:47 locust sshd[6905]: Failed password for root from 221.229.172.76 port 60763 ssh2
+Nov  3 10:45:48 locust sshd[6905]: Received disconnect from 221.229.172.76: 11:  [preauth]
+Nov  3 10:45:48 locust sshd[6905]: PAM 2 more authentication failures; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.229.172.76  user=root
+Nov  3 10:50:03 locust sshd[10262]: Accepted password for brno-bet from 78.102.65.252 port 58994 ssh2
+Nov  3 11:00:01 locust CRON[13676]: pam_unix(cron:session): session opened for user root by (uid=0)
+Nov  3 11:00:01 locust CRON[13680]: pam_unix(cron:session): session opened for user hosting by (uid=0)
+Nov  3 11:08:20 locust sshd[14674]: Accepted publickey for root from 172.18.19.191 port 59102 ssh2
+Nov  3 11:08:20 locust sshd[14674]: pam_unix(sshd:session): session opened for user root by (uid=0)
+Dec 16 16:24:59 locust sshd[13685]: Failed password for risto from 10.12.2.5 port 41063 ssh2

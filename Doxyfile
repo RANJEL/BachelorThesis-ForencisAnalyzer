@@ -1,0 +1,8 @@
+PROJECT_NAME   = "Forensic Analyzer v.1.0.0"
+PROJECT_BRIEF  = "Forensic Analyzer is graphical interface of SEC+. It allows you to search for event correlations across various log files. Specify suspicious activities by adding rules into configuration files and start the offline forencis analysis. Copyright (C) 2017 Jan Lejnar"
+GENERATE_LATEX = NO
+GENERATE_HTML  = YES
+EXTRACT_ALL    = YES
+HAVE_DOT       = YES
+UML_LOOK       = YES
+INPUT          = "./src"

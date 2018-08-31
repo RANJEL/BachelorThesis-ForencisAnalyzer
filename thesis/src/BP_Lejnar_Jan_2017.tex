@@ -1,0 +1,1089 @@
+% options:
+% thesis=B bachelor's thesis
+% thesis=M master's thesis
+% czech thesis in Czech language
+% slovak thesis in Slovak language
+% english thesis in English language
+% hidelinks remove colour boxes around hyperlinks
+
+\documentclass[thesis=B,czech]{FITthesis}[2012/06/26]
+
+\usepackage[utf8]{inputenc} % LaTeX source encoded as UTF-8
+
+\usepackage{graphicx} %graphics files inclusion
+% \usepackage{amsmath} %advanced maths
+% \usepackage{amssymb} %additional math symbols
+
+\usepackage{dirtree} %directory tree visualisation
+\usepackage{listings}
+\def\listingsfont{\ttfamily}
+\lstset{
+    extendedchars=true,
+    literate=  
+		 {á}{{\'a}}1
+         {í}{{\'i}}1
+         {é}{{\'e}}1
+         {ý}{{\'y}}1
+         {ú}{{\'u}}1
+         {ó}{{\'o}}1
+         {ě}{{\v{e}}}1
+         {š}{{\v{s}}}1
+         {č}{{\v{c}}}1
+         {ř}{{\v{r}}}1
+         {ž}{{\v{z}}}1
+         {ď}{{\v{d}}}1
+         {ť}{{\v{t}}}1
+         {ň}{{\v{n}}}1                
+         {ů}{{\r{u}}}1
+         {Á}{{\'A}}1
+         {Í}{{\'I}}1
+         {É}{{\'E}}1
+         {Ý}{{\'Y}}1
+         {Ú}{{\'U}}1
+         {Ó}{{\'O}}1
+         {Ě}{{\v{E}}}1
+         {Š}{{\v{S}}}1
+         {Č}{{\v{C}}}1
+         {Ř}{{\v{R}}}1
+         {Ž}{{\v{Z}}}1
+         {Ď}{{\v{D}}}1
+         {Ť}{{\v{T}}}1
+         {Ň}{{\v{N}}}1                
+         {Ů}{{\r{U}}}1   
+  ,
+}
+% % list of acronyms
+% \usepackage[acronym,nonumberlist,toc,numberedsection=autolabel]{glossaries}
+% \iflanguage{czech}{\renewcommand*{\acronymname}{Seznam pou{\v z}it{\' y}ch zkratek}}{}
+% \makeglossaries
+
+\newcommand{\tg}{\mathop{\mathrm{tg}}} %cesky tangens
+\newcommand{\cotg}{\mathop{\mathrm{cotg}}} %cesky cotangens
+
+\department{Katedra softwarového inženýrství}
+\title{Nástroj pro forenzní analýzu serverových logů}
+\authorGN{Jan} %(křestní) jméno (jména) autora
+\authorFN{Lejnar} %příjmení autora
+\authorWithDegrees{Jan Lejnar} %jméno autora včetně současných akademických titulů
+\supervisor{Ing. Jan Baier}
+\acknowledgements{Mé poděkování patří zejména Ing. Janu Baierovi za cenné rady, věcné připomínky a vstřícnost při konzultacích v~průběhu vypracovávání této bakalářské práce.}
+\abstractCS{Tato práce se zabývá forenzní analýzou serverových logů, jak v~nich obsažené údaje propojit a využít. Cílem je navrhnout modulární nástroj, který dokáže vytvořit přehled událostí v~definovaném časovém intervalu. V~přehledu jsou patrné korelace, jako podezřelé aktivity typu: neúspěšný pokus o~přihlášení a následný opakovaný pokus o~autentizaci ze stejné zdrojové adresy atd. Nástroj je možné využít ke zvýšení bezpečnosti a monitorování událostí na serveru. 
+Aplikace je vybudována z~části na existujícím řešení, které bylo nutné lehce vylepšit pro účel této práce. Druhou částí je grafická nadstavba, kterou jsem vytvořil ve \textit{frameworku} Qt. Z~pohledu programovacích jazyků se jedná o~kombinaci C++ a Perlu.
+Výsledkem práce je funkční aplikace, která je připravena na možnost dalšího rozšíření. Pro správce serveru nebude problém dodefinovat si podezřelé aktivity, které by chtěl sledovat. Vytvořené řešení úspěšně shlukuje údaje ze serverových logů a provádí nad nimi forenzní analýzu.
+}
+
+\abstractEN{This thesis deals with the forensic analysis of server logs, how to connect and utilize the data taken from these log files. The goal is to design a modular tool that has the ability to create an overview of events within a defined time interval. Correlations can be seen in the report. For example suspicious activities such as unsuccessful login attempt and following repeated attempts to authenticate from the same source address, etc. The tool can be used to increase security and monitor events on the server.
+The application is built in part on an existing solution that had been slightly improved for the purpose of this work. The second part is the graphic superstructure that I~created in the Qt \textit{framework}. It is a combination of C ++ and Perl from the perspective of programming languages.
+The result of the work is a functional application that is ready for further expansion. The server administrator will easy manage to specify suspicious activities he wants to track. The solution created successfully merges data from server logs and performs forensic analysis.}
+\placeForDeclarationOfAuthenticity{V~Praze}
+\declarationOfAuthenticityOption{4} %volba Prohlášení (číslo 1-6)
+\keywordsCS{forenzní analýza, serverové logy, monitorování událostí, podezřelé aktivity,  bezpečnost, modulární nástroj, Qt, C++, Perl}
+\keywordsEN{forensic analysis, server logs, event monitoring, suspicious activities, security, modular tool, Qt, C++, Perl}
+% \website{http://site.example/thesis} %volitelná URL práce, objeví se v tiráži - úplně odstraňte, nemáte-li URL práce
+
+\begin{document}
+
+%\newacronym{CVUT}{{\v C}VUT}{{\v C}esk{\' e} vysok{\' e} u{\v c}en{\' i} technick{\' e} v Praze}
+%\newacronym{FIT}{FIT}{Fakulta informa{\v c}n{\' i}ch technologi{\' i}}
+
+\begin{introduction}
+	S~roustoucí popularitou webových aplikací také roste význam bezpečnosti na internetu. Jednou z~možností, jak zmenšit riziko zneužití, je nepodceňovat informace ze serverových logů, což jsou soubory, do kterých se na serveru zaznamenávají zajímavé události a aktivity. Tyto události se obvykle logicky rozčlení, a proto lze na serveru nalézt více typů logů. Například chybový a přístupový log.
+	
+Logovací soubory jsou cenným zdrojem informací pro forenzní analýzu, která umožňuje dohledat sled událostí, které vedly k~nějakému nežádanému incidentu. Pokud dvě události korelují, znamená to, že spolu nějak souvisí. Hledání takovýchto korelací je přesně hlavním úkolem forenzní analýzy.
+	
+\section{Seznámení s~problematikou}
+	V~dnešní době většina softwaru, webových serverů atd. loguje. Programátory to nestojí mnoho úsilí. Otázkou je, jak moc jsou tyto logy následně využívány. Je potřeba říci, že logy jsou často velice nedoceněné a opomíjené. Není neobvyklé, že jsou ignorovány, dokud nezačnou zabírat na disku příliš mnoho místa. \cite{logManagement}
+	
+Logovací soubory nejčastěji ocení systémoví administrátoři, nicméně ruční procházení logů je pracné a zdlouhavé. Lze napsat skripty na vytažení konkrétního údaje. Pro agregaci zjištěných informací, s~cílem zjistit vyšší smysl útržků, je již však lepší využít nějaký automatizovaný nástroj.
+
+Avšak vytvořit nástroj pro forenzní analýzu není triviální úkol, protože nelze aplikovat mnoho obecných postupů. Hlavní důvody jsou dva:
+\newpage
+		\begin{enumerate}
+			\item Každý výrobce zpravidla používá svůj formát logu, což ztěžuje následnou snahu spojit údaje z~více logů a hledání korelací.
+			\item Efektivní analýza vyžaduje znalost konkrétního prostředí. Je potřeba definovat, co je podezřelá aktivita a co není. Například informace o~vypnutí serveru o~víkendu může být v~některém prostředí podezřelá, jinde ovšem zcela běžná.
+		\end{enumerate}	
+	
+
+\section{Motivace}
+	Do budoucnosti lze předpokládat, že objem logovacích dat ještě dramaticky naroste, stejně jako pestrost různých formátů logů. Po pravdě řečeno, již dnes mají některé organizace k~dispozici kolem 1 PB logovacích dat, proto je výzvou vytvořit dostatečně rychlý a sofistikovaný nástroj, který dokáže nalézt korelace v~rozumném čase. \cite{logManagement}
+	
+	Bylo by ideální, kdyby se začal dodržovat nějaký standardizovaný formát logu, jako například \textit{Common Log Format}. \cite{commonLogfileFormat} Bohužel různí výrobci považují jiné informace za důležité a některé je pro ně zbytečné evidovat, proto definují vlastní formát logu.
+	
+	Analýza logů je tedy nucena být připravena na tuto skutečnost. Existuje mnoho nástrojů, které dokážou zkoumat logy vybraných formátů. Mým cílem je vytvořit modulární aplikaci, která bude podporovat základní typy logů, ale také umožní hledat korelace i napříč logovacím souborem, který má atypický formát.
+	
+\section{Struktura práce}
+Text práce je členěn do šesti kapitol. V~první kapitole popisuji cíle práce. Druhá kapitola se zabývá literární rešerší již existujících nástrojů pro práci s~logy. V~této kapitole také představuji základní typy serverových logů. Třetí kapitola je věnována určitým fázím softwarovému procesu -- od sběru požadavků, přes analýzu, až po implementaci. Čtvrtá kapitola obsahuje instalační a uživatelskou příručku. V~páté kapitole je uvedeno, jakým způsobem probíhalo testování a jaké mělo výsledky. V~poslední kapitole rekapituluji, jak jsem práci vypracoval a shrnuji přínosy vytvořeného nástroje.
+	
+\end{introduction}
+		
+\chapter{Cíl práce} 
+Cílem práce je navrhnout po softwarově-inženýrské stránce nástroj, který dokáže spojit více logů a jeho hlavním úkolem bude zobrazit přehled podezřelých aktivit v~nějakém časovém intervalu. V~přehledu budou patrné korelace, jako podezřelé aktivity typu: neúspěšný pokus o~přihlášení a následný opakovaný pokus o~autentizaci ze stejné zdrojové adresy atd. 
+
+Navíc je kladen důraz na modularitu aplikace, aby bylo možné dodefinovat pravidla popisující, co je podezřelá aktivita a jaká akce se má provést, pokud k~této aktivitě dojde. Není žádoucí vytvořit aplikaci, která by podporovala pouze vybranou množinu typů logů. Kromě nejčastějších formátů si musí být navržený nástroj schopný poradit i s~atypickým formátem logu.
+
+Výsledkem práce bude funkční prototyp aplikace, připraven na možnost dalšího rozšíření. Pro správce serveru nebude problém si dodefinovat aktivity, které by chtěl sledovat, a také specifikovat požadovanou reakci (například odeslat upozorňovací e-mail).
+
+Nástroj bude možné využívat ke zvýšení bezpečnosti a monitorování událostí na serveru. 
+
+\chapter{Literární rešerše}
+\section{Analýza formátů logů}
+Jak jsem již zmiňoval v~úvodu, existuje mnoho rozmanitých formátů logů. Každý výrobce rád používá svůj specifický formát. Jaké jsou příklady známých serverových logů, jaké informace mohou obsahovat a kde se tyto informace nacházejí, popíšu v~následující podkapitole. 
+
+\subsection{Příklady logů}
+
+\subsubsection{Linuxové systémové autorizační logy}
+Tento soubor typicky najdete v~linuxových distribucích s~absolutní cestou \texttt{/var/log/auth.log}. Sleduje používání mechanismů pro autorizaci uživatele sudo(příkaz \texttt{sudo}), vzdálené přihlášení k~sshd atd. Jde o~dobrý zdroj informací při zjišťování, zda se někdo neoprávněně nedostal na server. \cite{linuxLogFiles}
+
+\begin{lstlisting}[frame=single,caption=Formát události z~linuxového autorizačního logu \cite{linuxLogFiles},label=formatAUTH]
+<měsíc> <den> <čas> <identifikace PC v síti> 
+<název démona>[<pid démona>]: <zpráva>
+\end{lstlisting}
+
+\begin{lstlisting}[frame=single,caption=
+Příklad události (viz \texttt{auth.log}),label=exampleAUTH]
+Nov  3 10:44:49 locust sshd[6905]: Failed password 
+for root from 221.229.172.76 port 60763 ssh2
+\end{lstlisting}
+ 
+\subsubsection{E-mailové logy poštovního systému Postfix}
+\textit{\uv{Umístění a název tohoto logu jsou definovány v~konfiguračním souboru syslog.conf. Zpravidla to bývá buď /var/log/maillog, nebo /var/log/mail}.} \cite{bpLacina}
+ 
+Tento log zaznamenává údaje o~příchozí a odchozí e-mailové komunikaci.
+Zde se dají zjistit pokusy o~rozesílání nebo doručování spamu apod.
+ 	
+\begin{lstlisting}[frame=single,caption=Formát události e-mailového logu poštovního systému Postfix \cite{bpLacina},label=formatMAIL]
+<měsíc> <den> <čas> <identifikace PC v síťi> 
+<název démona>[<pid démona>]: <zpráva>
+\end{lstlisting}
+
+
+\begin{lstlisting}[frame=single,caption=Příklad události doslova převzaný z~\cite{bpLacina},label=exampleMAIL]
+Jan 10 16:34:11 robin postfix/smtpd[2175]: connect 
+from gmmr1.centrum.cz[46.255.225.252]
+\end{lstlisting}
+
+\subsubsection{Chybové logy webového serveru Apache}
+Jde vůbec o~nejdůležitější logovací soubor serveru Apache. Na toto místo bude Apache httpd ukládat diagnózy a všechny chyby, které se objeví při zpracovávání požadavku na serveru. Lze nastavit míru severity, která určuje, jaké typy událostí se budou logovat, například \textit{error}, \textit{warn}, \textit{debug} atd. \cite{logFiles}
+
+\begin{lstlisting}[frame=single,caption=Formát události z~chybového logu serveru Apache \cite{logFiles},label=formatAPACHE_ERROR]
+[<datum a čas>] [<severita hlášené chyby>] [client 
+<IP adresa klienta, který chybu vyvolal>] [<zpráva>]
+\end{lstlisting}
+
+\begin{lstlisting}[frame=single,caption=Příklad události (viz \texttt{apache-access.log}),label=exampleAPACHE_ERROR]
+[Sun Oct 30 06:26:24 2016] [error] [client 91.236.75.4] 
+File does not exist: /var/www/reader
+\end{lstlisting}
+
+\subsubsection{Přístupové logy webového serveru Apache}
+Do tohoto logu se zaznamenávají všechny požadavky, který na Apache server přijdou. Nutno podotknout, že přesný formát logu je rozsáhle konfigurovatelný, a proto uvádím pouze jeho výchozí podobu, která odpovídá \textit{Common Logfile Format}. \cite{logFiles}
+
+\begin{lstlisting}[frame=single,caption=Formát události z~přístupového logu serveru Apache \cite{modLogConfig},label=formatAPACHE-ACCESS]
+<vzdálená IP adresa nebo jméno hostitele> <jméno 
+vzdáleného uživatele> <jméno autentizovaného 
+uživatele> [<čas přijetí požadavku>] "<1. řádka 
+zprávy>" <finální návratový http kód> 
+<velikost odpovědi v bajtech>
+\end{lstlisting}
+
+\begin{lstlisting}[frame=single,caption=Příklad události (viz \texttt{apache-access.log}),label=exampleAPACHE-ACCESS]
+127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] 
+"GET /apache/pb.gif HTTP/1.0" 200 2326
+\end{lstlisting}
+
+\subsubsection{Audit logy webového aplikačního firewallu}
+ModSecurity je oblíbený \textit{open-source} webový aplikační \textit{firewall}, který může být nainstalován na nejpoužívanější servery jako jsou Apache, NGINX nebo IIS. 
+Pokud přijde na server požadavek, který bude tímto \textit{firewallem} vyhodnocen jako podezřelý, bude zalogován jak do chybového logu serveru, tak do audit logu tohoto \textit{firewallu}. Jak demonstruje formát audit logu, v~tomto souboru je událost popsána velice detailně. 
+\cite{modSecurityAnalysis}
+
+\begin{lstlisting}[frame=single,caption=Formát události z~audit logu \cite{modSecurityDataFormats},label=formatMODSEC]
+<jméno hostitele, nebo IP adresa> <IP adresa> 
+<jméno vzdáleného uživatele> <jméno lokálního 
+uživatele> [<čas přijetí>] "<1. řádka zprávy>" 
+<návratový kód odpovědi> <počet odeslaných bytů> 
+<referenční informace> <user-agent informace> 
+<ID transakce> <ID sezení> <relativní cesta k audit 
+logu> <offset audit logu> <velikost audit logu> 
+<MD5 hash audit logu>
+\end{lstlisting}
+
+\begin{lstlisting}[frame=single,caption=Příklad události (viz \texttt{modsec\_audit.log}),label=exampleMODSEC]
+www.multikemp.cz 127.0.0.1 - - [30/Oct/2016:06:26:50 
++0100] "GET / HTTP/1.1" 403 202 "-" "-" 
+WBWEmlOn4fAAAFglO-EAAAAB "-" /20161030/20161030-0626/
+20161030-0626 50-WBWEmlOn4fAAAFglO-\\EAAAAB 
+0 1215 md5:0d9ce155d7572a45b395ff32569326ec
+\end{lstlisting}
+
+\subsubsection{Fail2ban logy}
+Fail2ban je zabezpečovací nástroj, který na určitou dobu zablokuje podezřelé IP adresy. Uživatel se stane podezřelým, pokud poruší nějaká pravidla, například překročení maximálního počtu neúspěšných přihlášení za časový interval. V~logu tohoto nástroje lze nalézt stopy po \textit{brute-force} útoku. 
+\cite{Fail2BanSetup}
+
+\begin{lstlisting}[frame=single,caption=Formát události z~fail2ban logu \cite{Fail2BanSetup},label=formatFAIL2BAN]
+<rok>-<měsíc>-<den> <hodiny>:<minuty><sekundy>,
+<milisekundy> fail2ban.<komponenta>: 
+<severita události> <zpráva>
+\end{lstlisting}
+
+
+\begin{lstlisting}[frame=single,caption=Příklad události (viz \texttt{fail2ban.log}),label=exampleFAIL2BAN]
+2016-10-30 06:06:45,397 fail2ban.actions: WARNING 
+[ssh] Ban 221.229.172.75
+\end{lstlisting}
+
+\subsubsection{Logy správce balíčků pro Debian}
+Balíčkovací systém Debianu vytváří log, který obsahuje informace o~instalacích softwarových balíčků. Tento log lze využít ke zjištění, zda nebyl nějaký software nainstalován neoprávněně.
+\cite{dpkg}
+
+\begin{lstlisting}[frame=single,caption=Formát události z~logu správce balíčků pro Debian \cite{dpkg},label=formatDPKG]
+<rok>-<měsíc>-<den> <hodiny>:<minuty><sekundy> 
+<typ události> <zpráva>
+\end{lstlisting}
+
+\begin{lstlisting}[frame=single,caption=Příklad události (viz \texttt{dpkg.log}),label=exampleDPKG]
+2016-09-05 10:05:21 status 
+installed libtiff4:amd64 3.9.6-11+deb7u1
+\end{lstlisting}
+
+\subsection{Analýza využitelnosti, co je potřeba ke hledání korelací}
+Jak můžete vidět, některé události jsou jen velmi stručné, jiné samy o~sobě poskytují tolik informací, že není potřeba hledat další korelující události.
+
+Většina logovacích nástrojů umožňuje měnit formát a množství evidovaných informací pomocí logovacích stupňů. Není vhodné rovnou nastavit nejdetailnější stupeň logování, protože tím často nezískáte více cenných informací, jen několikanásobně zvětšíte velikost, kterou vám budou logy zabírat na disku. \cite{auditAndTrace}
+
+Pokud nějaká společnost potřebuje provádět forenzní analýzu, může logy předzpracovávat, normalizovat. Stačí znát formát svých logů, vědět, kde se které entity nacházejí, a poté je možné všechny typy logů namapovat na jeden společný formát. Pro více informací o~normalizaci logů doporučuji \cite{auditAndTrace} kapitola 4: \uv{Deciding What to
+Capture and How to Do It}
+
+Já se ovšem snažím navrhnout univerzální nástroj, proto si nemohu nějakou normalizaci dovolit. Nevím, jaké logy budu zpracovávat, natož co v~nich je důležité a co je možné vynechat. Ano, napadla mě možnost, že bych donutil uživatele specifikovat, jak převést jeho formát logu na standardizovaný CLF formát. Tato cesta by ovšem znamenala, že konverzí nějakého logu bych přišel o~potenciálně důležité informace. Pokud bych naopak definoval nějaký velice obecný formát, který by se snažil pokrýt co nejvíce elementů, které se mohou v~logovacích souborech objevit, po konverzi by bylo mnoho elementů nedefinovaných, nemluvě o~velikosti takového logu.
+
+Budu tedy mít logy v~různém formátu a s~informacemi, které spolu vůbec nemusí souviset. Lze vůbec odhadnout, co lze očekávat v~každém logu a co je nezbytné pro hledání korelací?
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/PodobneEntity.eps}
+  \caption{Podobné entity napříč různými typy logů}
+  \label{fig:PodobneEntity}
+\end{figure}
+
+Na obrázku \ref{fig:PodobneEntity} můžete vidět příklady všech výše zmíněných logů. Snažil jsem se nalézt entity, které se nachází v~každém typu logu. 
+Došel jsem k~závěru, že v~drtivé většině logů bude informace, kdy k~události došlo. Tyto údaje jsou vyznačené modře. Dále je velice pravděpodobné, že v~logu bude uvedeno, kdo danou událost vyvolal, popř. koho se týká. Touto informací ovšem může být IP adresa, název hostitele nebo uživatelské jméno. Navíc je tento údaj jen výjimečně povinným elementem (vyznačeno červeně). Pokud budeme mít štěstí, bude součástí popisu události (vyznačeno oranžově). Entita \uv{kdo} vyžaduje chápání kontextu konkrétního logu, a proto je lepší ji zařadit spíše do skupiny elementů, které lze získat, ale obecně nejsou nezbytné k~hledání korelací.
+
+Pokud budu hledat nějaké korelace s časovými filtry nebo podmínkou, že události musí nastat v~nějakém časovém intervalu, potřebuji získat z~událostí \textit{timestamp}. To je zřejmě jediné, co k~hledání pokročilých korelací potřebuji. O~tom, jakým způsobem zajistím získání času z~libovolné události, se rozepíšu v~návrhu své aplikace.
+
+\section{Srovnání existujících nástrojů pro práci s~logy}
+Při vybírání vhodného nástroje pro analýzu logů jsem narazil na mnoho hotových řešení s~různým zaměřením, například:
+
+\begin{itemize}	
+	\item{XpoLog Center -- Komplexní aplikace pro log management\footnote{Obecný termín řízení logů zahrnuje činnosti: sběr, archivaci, agregaci a analýzu logů, popřípadě tvorbu upozornění.}. Dokáže přes SSH protokol agregovat logy jakéhokoliv typu. Pro práci s~těmito logy podporuje například: hlášení nalezených událostí, monitorování, hledání korelací, sledování transakcí, \ldots
+\cite{xpoLog}}
+	\item{Splunk -- Jedná se o~komerční nadstavbu OSSEC, o~kterém bude řeč později. Jeho hlavním přínosem je širší množina podporovaných formátů logů, v reálném čase vytvářené přehledy aktivit a široce nastavitelné upozorňování. \cite{logManagement}}
+	\item{ClickTracks Optimizer -- Slouží k~analýze aktivit na webových stránkách. \cite{clicktracks}}
+	\item{Event Log Explorer -- Robustní aplikace pro interaktivní zkoumání Windows událostí. \cite{forensicWithOpenSource}}
+	\item{Log Parser -- CLI nástroj od Microsoftu, který umožňuje vytvářet SQL dotazy nad širokým spektrem dat. Například \textit{Event Logs} (soubory s~přípomou \texttt{.evt}, popřípadě \texttt{.evtx}), které vytváří Windows. \cite{forensicWithOpenSource}}
+\end{itemize}
+
+První tři jsou dostupné pod komerční licencí, popřípadě je dostupná trial verze. Poslední dva jsou určeny pouze pro Windows, ale má forenzní analýza bude probíhat na linuxovém serveru.
+
+Mým cílem je vytvořit volně šiřitelný program, proto jsem se vydal spíše cestou \textit{open-source} nástrojů.
+
+\textit{Open-source} nástroje sice často nejsou tak komplexní, ale přínáší jiné výhody. Nulová pořizovací cena, jednoduchá přenositelnost a zejména možnost reálně upravit zdrojový kód. V~případě problémů lze nahlédnout přímo do implementace. \cite{forensicWithOpenSource}
+
+Při dalším hledání jsem narazil na nástroje, které nějakým způsobem pracují s~logy, ale nepokrývají požadovanou funkcionalitu (neumožňují hledání korelací):
+\begin{itemize}
+	\item{rconvlog \& convlog -- Převádí formáty logů na CLF formát logu. \cite{rConvlog}}
+	\item{Chainsaw -- GUI prohlížeč logů pro Log4j\footnote{Logovací \textit{framework} pro Javu.}. \cite{chainsaw}}
+	\item{Sematext Docker Agent -- Jde o~agenta, který má za úkol automatický sběr událostí. \cite{docker}}
+	\item{Snare \& syslog -- Snare umožňuje, aby Windows události mohly být poslány přes syslog\footnote{Protokol sloužící k přeposílání zpráv z logů po síti.}. \cite{logManagement}}
+\end{itemize}
+
+Pro statickou analýzu logů by jistě šlo využít nástrojů jako grep, sed, awk, head, tail. Tyto utility jsou standardní součástí většiny linuxových distribucí a jsou hojně využívány serverovými administrátory, kterým slouží jako stavební kameny pro tvorbu skriptů. Jejich použití vyžaduje ovšem příliš mnoho manuálního práce, hodí se na vytažení konkrétního údaje, nikoliv pro hledání korelací. \cite{logManagement}
+
+Statické nástroje byly zavrhnuty, protože práce s~nimi je komplikovaná při snaze hledání korelací z~více logovacích souborů. Vývoj aplikace touto cestou by de facto znamenal začít na tzv. \uv{zelené louce}. Výhodou by byla vysoká flexibilita, ale za cenu velké pracnosti.
+
+Oproti statickým existují automatizované nástoje dvou typů: \cite{insiderThreatDetection}
+\begin{enumerate}
+	\item Offline monitorující -- při spuštění začnou hledat chybové vzory, pomocí předem definovaných pravidel. Pokud je nějaký vzor nalezen, často dokážou také zareagovat podle specifikace v~pravidlech pro daný vzor. Tyto nástroje mohou být spuštěny několikrát denně, jejich nevýhodou ovšem je, že preventivní reakce na sled událostí nemohou být provedeny ve správný čas. 
+	\item Online monitorující -- odstraňují předchozí omezení a umožňují průběžné sledování logů. Dokážou reagovat na události v~reálném čase, ignorovat duplicitní události nebo dynamicky měnit pravidla, která definují podezřelé aktivity.
+\end{enumerate} 
+
+Rozhodl jsem se tedy částečně využít nějakého již funkčního řešení. Ze zadání plyne, že je dostačující si vybrat nějaký offline automatizovaný nástroj, který dokáže analyzovat logy. Následuje seznam nejlepších nástrojů, ze kterých jsem vybral vítěze Simple Event Correlator.
+
+\subsection{Webalizer}
+Oblíbený nástroj pro analýzu serverových logů. \cite{webalizer, webalizerReadme}
+	
++ Vytváří grafické přehledy v~HTML formátu, které je poté možné sledovat v~jakémkoliv standardním webovém prohlížeči.
+	
++ Je napsaný v~jazyce C, což jej činí velice rychlým. Dokáže zpracovat cca 70 000 událostí za 1 vteřinu. 
+
++ Zvládá mnoho formátů logů.
+
++ Podporuje asi 30 světových jazyků.
+
++ Není potřeba posílat informace o~svém webu jiným serverům, jako tomu je například u~konkurečního řešení Google Analytics.
+
+$-$ Určený spíše pro sledování aktivity uživatelů na webu.
+
+$-$ Jen kolem sta konfiguračních parametrů, které lze použít v~konfiguračním souboru. To znamená, že tato aplikace neumožňuje dostatečně detailně definovat, co je podezřelá aktivita.
+
+\subsection{LogWatch}
+Tento nástroj se snaží události z~logů interpretovat a kompletovat. Na základě této analýzy posílá e-mailem přehled důležitých událostí a příslušné statistiky. \cite{logwatch}	
+
++ Definice podezřelých událostí a jejich interpretace zajišťují skripty napsané v~Perlu, které tvoří konfiguraci tohoto nástroje.
+
++ Lze popsat regulárními výrazy, jaké události májí být ignorovány.
+
++ Je možné vymezit interval, který definuje, z~jaké doby se mají události zpracovávat.
+
+$-$ Komplexnější definice podezřelých aktivit je nutné definovat v~Perlu. LogWatch neposkytuje pokročilou konfiguraci bez znalosti programovacích jazyků.
+
+\subsection{ELK Stack}
+\label{elk}
+ELK Stack je kolekce tří \textit{open-source} produktů: Elasticsearch, Logstash a Kibana. Logstash je nástroj, který slouží ke sběru a parsování logů. Dokáže sbírat logy z~mnoha zdrojů, transformovat nebo filtrovat pomocí tzv. \textit{Grok patternů} \cite{grok}, které mi byly inspirací při tvorbě aliasů v~mnou navrženém nástroji. 
+Elasticsearch je NoSQL\footnote{Alternativa relačních databází, která nevyžaduje definovat schémata. Proto jsou NoSQL databáze vhodnější pro ukládání nestrukturovaných dat, která se neukládají do řádků a sloupců, ale stylem klíč -- hodnota.} databáze, která umožňuje v~datech vyhledávat a analyzovat je. Kibana je vizualizační vrstva, dovolující vykreslovat různé grafy apod. \cite{elkStack, openSourceLogging}
+
++ Tento produkt vytlačil dřívějšího leadera Splunk, protože je \textit{open-source} a přitom dosahuje stejných kvalit. 
+
++ Široká možnost konfigurace.
+
++ \textit{Grok patterny}.
+
++ Podpora NoSQL databáze.
+
++ Předpřipravené GUI.
+
+$-$ Těžkopádný nástroj.
+
+\subsection{OSSEC}
+OSSEC je výborný nástroj pro analýzu logů, jehož hlavní silou je generování upozornění, která dokáže zadržet a uložit. Jeho cílem je detekovat hrozby a zajistit, že budou včas rozpoznány a provede se příslušná akce. \cite{logManagement}
+	
++ Přednastavená pravidla, možnost vlastních pravidel v~XML.
+	
++ Upozorňování v~reálném čase.
+	
++ Webové uživatelské rozhraní.
+
++ Odlehčený nástroj.
+
++ Podpora MySQL\footnote{\textit{Open-source} relační databáze.} a PostgreSQL\footnote{Objektově-relační databáze.} pro ukládání hlášených upozornění. 
+	
++ Funguje téměř ve všech OS.
+	
+$-$ Ve výchozím nastavení zadržuje jen logy, které vyvolaly upozornění. 
+	
+$-$ Je nutné vyhradit volné místo na disku nebo použít databázi.
+	
+$-$ Cílem je zvýšit bezpečnost, ne detailní hledání korelací. Patří mezi takzvané HIDS.
+
+\subsection{OSSIM}		
+Open Source Security Information Management je kombinace více aplikací. Jednou z~nich je již zmiňovaný OSSEC, oproti kterému se může OSSIM pyšnit vylepšeným bezpečnostním management systémem. Další výhodou je integrace programu Snort pro hledání korelací. Jde o~tzv. SIEM nástroj. \cite{logManagement} 
+
+Podle mého názoru ovšem toto vylepšení nevyváží nárůst složitosti SIEM nástroje, proto bych dal přednost programu OSSEC. 
+
+\subsection{Tripwire}
+Tripwire naopak poskytuje téměř stejnou funkcionalitu, jako OSSEC. Je dostupný jak pod \textit{open-source}, tak pod enterprise edicí. Pokud ovšem budu porovnávat jen jeho \textit{open-source} verzi, pak se jedná špíše o~slabší alternativu OSSEC, protože neexistuje žádná podpora pro Windows, a navíc Tripwire neumožňuje upozorňování v reálném čase. \cite{tripwireVsOssec}
+
+\subsection{OpenNMS} 
+OpenNMS je aplikace sloužící především k~monitorování sítě. Provádí sběr událostí a generuje upozornění. Na tomto nástroji mne zaujalo, že vygenerované upozornění může spustit další hledání korelací. OpenNMS jsem ovšem zavrhnul ve chvíli, kdy jsem zjistil, že je napsaný v~Javě. Nefunkčním požadavkem této práce je vyhnout se nutnosti instalovat virtuální stroj na server. \cite{openNMS}
+
+\subsection{LogHound}
+LogHound hledá opakující se vzory řádek v~množině logovacích souborů. \cite{logManagement} Tento nástroj považuje každou řádku logu za transakci, která se skládá z~elementů. Množinu elementů považuje za frekventovanou, pokud alespoň \textit{N} transakcí obsahuje všechny tyto elementy. Konkrétní \textit{N} lze definovat pomocí argumentů programu. \cite{loghound} 
+
+LogHound mě přivedl na stránky autora (Risto Vaarandi), který vytvořil mnoho utilit pro práci s~logy.	
+	
++ Jednoduchý nástroj napsaný v~jazyce C.
+	
++ Podpora regulárních výrazů pro substituce nebo definice oddělovačů elementů.
+	
+$-$ Pouze jednoduchá analýza logů bez možnosti hledání složitějších korelací.
+	
+$-$ Není možné definovat vlastní reakci na úspěšné nalezení frekventované množiny.
+
+ 
+\subsection{SEC}
+Simple Event Correlator je dalším nástrojem od pana Risto Vaarandi. Jak již název napovídá, SEC je program pro hledání pokročilých korelací. Může být využit k~monitorování logů, řízení sítě nebo bezpečností forenzní analýze. \cite{secManPage, insiderThreatDetection}
+	
++ Dokáže číst data z~mnoha zdrojů: ze souborů, ze standardního vstupu až po pojmenované roury.
+		
++ Používá konfigurační soubor pro definici podezřelých aktivit. Tyto podezřelé aktivity dokáže popsat pomocí mnoha předpřipravených typů pravidel.
+	
++ Pro administraci konfiguračního souboru není potřeba znalost programovacího jazyka.
+
++ Velice mocná je možnost specifikace jak podezřelých aktivit, tak reakce na ně pomocí Perlu.	
+
++ Podporuje regulární výrazy, kterými lze popsat mnoho hledaných vzorů.
+	
++ Umožňuje definovat kontexty, které dokážou spojit jednoduché regulární výrazy nebo definovat další události, které musí nastat, aby se jednalo o~podezřelou aktivitu. Umožňují například přidat podmínky, ze kterého logu musí událost přijít, v~jakém časovém intervalu apod.
+	
++ Dokáže definovat, jaká reakce na podezřelou aktivitu se má provést. Obsahuje například zabudovanou možnost spouštět externí programy, např. \texttt{mail} -- k~odeslání upozorňovacího e-mailu správci serveru.
+		
++ Výborná dokumentace.
+	
++ Odlehčený nástroj.
+	
++ Napsaný v~Perlu, tedy platformově nezávislý.
+
+$-$ Absence GUI.
+	
+\label{SECMinus}	
+$-$ Při offline čtení logovacích souborů nepodporuje pravidla pro práci s~časem. (Nedokáže vytáhnout čas události, který je na právě zpracovávané řádce logu.) 
+
++ Pokud tyto logy sleduje online, tedy pokud se o~událostí dozví přesně ve chvíli, kdy se objeví ve sledovaném logu, dokáže s~časem pracovat velmi dobře.
+
+\section{Představení vybraného nástroje}
+Aby bylo možné popisovat podezřelé aktivity, je nutné se nejdříve stručně seznámit s~tvorbou pravidel v~nástroji Simple Event Correlator. 
+
+Při forenzní analýze se prochází všechny řádky logů, kde každá řádka symbolizuje jednu událost. SEC se pro každou událost podívá na všechna pravidla a snaží se nalézt shodu, nějaké pravidlo, které právě na takovou událost čekalo.
+
+Pravidla se zapisují do konfiguračního souboru a oddělují se práznými řádkami, bílými znaky nebo pomocí komentářů (začínají symbolem \uv{\#}). To znamená, že se tyto elementy uvnitř samotného pravidla vyskytovat nemohou. Pokud je nějaká řádka pravidla příliš dlouhá, lze použít symbol \uv{\textbackslash} a pokračovat na další řádce. \cite{secManPage}
+
+Každé pravidlo obsahuje informaci, jakého je typu. SEC má zabudována například tato pravidla: \cite{usingSEC, secManPage}
+\begin{itemize}
+	\item Single -- Pokud nastane shoda, okamžitě se provede akce (reakce na událost), která je specifikována v~rámci tohoto pravidla. Jednoduché pravidlo, které nehledá žádné korelace.
+	\item Suppress -- Zde naopak pokud shoda nastane, tak se žádná akce neprovede. Hledání shody bude ovšem pokračovat procházením ostatních pravidel. Ve výchozím nastavení totiž jakmile SEC nalezne první shodu, pak už další v~pravidlech nehledá. Toto pravidlo může sloužit k~filtraci událostí. 
+	\item Calendar -- Tento typ je specifický, protože jako jediný ignoruje vstupní logy. Umožňuje naplánovat nějakou akci na konkrétní čas.
+	\item SingleWithScript -- Při shodě se spustí definovaný skript a po jeho doběhnutí se vykoná jedna ze dvou akcí, v~závislosti na výsledku tohoto skriptu. Na rozdíl od tohoto a předchozích, následující pravidla již dokážou hledat korelace.
+	\item SingleWithSuppress -- Toto pravidlo se chová podobně jako Single, ovšem při shodě také zahájí hledání korelací po dobu \textit{T} sekund, kde \textit{T} lze definovat. Korelací může být v~tomto případě pouze stejná událost, která přijde později. Všechny takovéto události budou ignorovány po dobu \textit{T} sekund. Teprve poté může shoda znovu nastat.
+	\item SingleWithThreshold -- Provede akci, pokud dojde k~\textit{N} opakovaným událostem během nějaké doby, viz \ref{exampleSingleWithThreshold}. Hodnota \textit{N} je specifikována polem \texttt{thresh}.
+	\item EventGroup -- Jde o~zobecněnou verzi předchozího pravidla. Umožňuje napočítávat libovolný počet událostí různého typu v~rámci společného intervalu (SEC používá termín okno -- pole \texttt{window}).
+	\item Pair -- Párové pravidlo provede 1. akci, pokud je splněna 1. část a 2. akce se provede, pouze pokud událost popsaná v~2. části dorazí včas. Dobu hledání této korelace lze samozřejmě nastavit na nekonečno.
+\end{itemize}
+
+Následující pravidlo hledá ve vstupních souborech 3 neúspěšné
+pokusy o~přihlášení pod stejnym uživatelským jménem během 
+1 minuty. Při shodě vypíše pole \texttt{desc} na standardní výstup.
+
+\begin{lstlisting}[frame=single,caption=Ukázka pravidla typu SingleWithThreshold,label=exampleSingleWithThreshold]
+type = SingleWithThreshold
+ptype = RegExp
+pattern = sshd\[\d+\]: Failed .+ for (\S+) from \
+[\d.]+ port \d+ ssh2
+desc = Three SSH login failures within 1m for user $1
+action=write -;
+window = 60
+thresh = 3
+\end{lstlisting}
+
+Každé pravidlo obsahuje řádky ve formátu \texttt{<klíč> = <hodnota>}, kde jako klíč lze použít pole, které daný typ pravidla podporuje. Některá pole jsou povinná, jiná volitelná.
+
+Důležité je také pole \texttt{ptype}, které definuje, jakým způsobem bude specifikován vzor popisující shodu. SEC poskytuje například: \cite{secManPage}
+\begin{itemize}
+	\item SubStr -- V~poli \texttt{pattern} bude očekáván podřetězec události, se kterou má vzniknout shoda. Tento způsob je časově efektivní, ale není možné událost volněji specifikovat.
+	\item RegExp -- Pomocí regulárních výrazů lze popsat většinu hledaných událostí. Lze zde efektivně využívat tzv. \textit{capture groups}, viz \cite{namedCaptureGroups}.
+	\item PerlFunc -- Vzor může obsahovat funkci napsanou v~jazyce Perl. Shoda nastane, pokud tato funkce vrátí \textit{true}. Slouží k~pokročilým popisům událostí tam, kde regulární výrazy nestačí.
+\end{itemize}
+
+Následující příklad byl převzán z~\cite{usingSEC}.\\
+Představte si vzor popsaný tímto regulárním výrazem: 
+\begin{verbatim}
+(\S+) sshd\[\d+\]: Accepted.*for (\S+) from (\S+) port (\d+)\s
+\end{verbatim}
+
+Shoda nastane, pokud se v~analyzovaném logu vyskytne například tato událost:
+\begin{verbatim}
+Sep 16 17:46:47 spirit sshd[12307]: Accepted password for rik 
+from 204.176.22.9 port 59926 ssh2
+\end{verbatim}
+\newpage
+Je důležité si uvědomit, že elementy uvnitř kulatých závorek (tzv. \textit{capture groups}) se po shodě uloží do proměnných \textit{\$i}, kde \textit{i} je pořadí skupiny.
+
+\begin{itemize}
+	\item \$1 = jméno hostitel (spirit)
+	\item \$2 = uživatelské jméno (rik)
+	\item \$3 = zdrojová IP adresa (204.176.22.9)
+	\item \$4 = číslo portu (59962)
+\end{itemize}
+
+Na tyto proměnné se lze v~rámci pravidla odkazovat, například v~popisu akce. V~poli \texttt{action} lze popsat, jaká akce se má provést, pokud nastane shoda. Ve skutečnosti lze zde specifikovat seznam akcí, stačí je oddělit středníkem. SEC podporuje mnoho možností, například zápis do souboru, pojmenované roury, \textit{socketu}, spustit externí skript, odeslat e-mail nebo poskytuje standardní CRUD operace s~takzvanými kontexty. \cite{secManPage}
+
+SEC není pouze sympatickým nástrojem pro hledání regulárních výrazů. Jeho hlavní silou je možnost využívat subrutiny napsané v~Perlu, a to jak pro popis vzoru, tak pro popis akce. Kontexty jsou druhou doménou tohoto nástroje. Umožňují spojovat jednotlivá pravidla, a vytvářet tak pokročilá korelační schémata. Existují doporučení, jak korelační schémata uspořádat do konfiguračních souborů, viz \cite{secBestPractices}.
+
+Kontexty mohou mít časem omezenou životnost nebo mohou například vznikat při každém čtení pouze z~konkrétního souboru. Časté použití kontextů je: Máme \textit{N} pravidel, pro každé vytvoříme unikátní kontext, pokud došlo ke shodě. Vytvoříme ještě 1 pravidlo, jehož akce se provede, jen pokud bude zároveň aktivovaných těchto \textit{N} kontextů. \cite{secManPage}
+
+Mezi další nepovinná, ale užitečná pole, jako byl \texttt{context}, patří například \texttt{continue} nebo \texttt{varmap}. Jelikož účelem mé bakalářské práce není duplikovat jinak výborné manuálové stránky SEC, pro více informací vás na ně jen odkazuji \cite{secManPage}.
+
+Následuje ještě jedna ukázka pravidla, které popisuje podezřelou aktivitu ze zadání, kdy dojde k~neoprávněnému požadavku na webovou stránku a následný pokus o~autentizaci ze stejné zdrojové adresy. V~implementaci jsem využil párového pravidla:
+\newpage
+\begin{lstlisting}[frame=single,caption=Ukázka pravidla typu Pair,label=examplePair]
+type = Pair
+ptype = RegExp
+pattern = \S+ (\d.+) \S+ \S+ \[.*\] ".*" 40(?:1|3) \d+
+desc = Unauthorized access to a website from \ 
+IP adress: $1
+action = none;
+ptype2 = RegExp
+pattern2 = (Failed|Accepted) password for (\S+) from \
+$1 port (\d+) ssh2
+desc2 = Correlation found from %1 port $3 -> \ 
+$1 password for the user $2
+action2 = write -;
+\end{lstlisting}
+
+\chapter{Realizace}
+\section{Sběr požadavků}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/SeznamPozadavku.eps}
+  \caption{Seznam požadavků}
+  \label{fig:SeznamPozadavku}
+\end{figure}
+Po výběru tématu bakalářské práce jsem se pustil souběžně s~rešerší do specifikace požadavků. Na obrázku \ref{fig:SeznamPozadavku} můžete vidět seznam požadavků, který jsem vytvořil v~aplikaci Enterprise Architect. Po konzultaci s~vedoucím práce jsem získal pár dalších požadavků, které přímo nevyplývaly ze zadání -- viz funkční požadavky F4 a F6 a nefunkční požadavek F7.
+
+\section{Model případů užití}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/UseCases.eps}
+  \caption{Model případů užití}
+  \label{fig:UseCases}
+\end{figure}
+Na obrázku \ref{fig:UseCases} je model případů užití mého nástroje, který reflektuje seznam požadavků \ref{fig:SeznamPozadavku}. 
+
+\section{Návrh aplikace}
+\subsection{Diagramy aktivit}
+Bylo klíčové detailně rozmyslet, co si představit pod těmi nejzajímavějšími modely případů užití. Na obrázku \ref{fig:ZobrazeniPodezrelychAktivit} je diagram aktivit popisující, jak si představuji \textit{use case}: \uv{Zobrazit podezřelé aktivity}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/ZobrazeniPodezrelychAktivit.eps}
+  \caption{Zobrazení podezřelých aktivit (\textit{activity diagram})}
+  \label{fig:ZobrazeniPodezrelychAktivit}
+\end{figure}
+
+Uživatel bude tedy moci nadefinovat pravidla popisující události, které chce sledovat a zadat zdrojové logy. Jakmile je všechny nadefinuje, tak další aktivitu už převezme \uv{Korelátor událostí}, ten všechny logy spojí, spustí hledání korelací dle definovaných pravidel a vytvoří výstup, podle kterého už jen GUI zobrazí požadovaný přehled. 
+
+Můžete si všimnout, že logiku programu jsem rozdělil na dvě zóny zodpovědnosti, GUI a \uv{Korelátor}. Učinil jsem tak, protože jsem se snažil najít nějaký nástroj, který by mi pomohl, abych nemusel začínat na \uv{zelené louce} a mohl se více zaměřit na grafickou nadstavbu.
+
+Obrázek \ref{fig:PridaniReakceKPravidlu} zachycuje, jakým způsobem jsem navrh realizaci požadavku F4 (Přidání reakce k~pravidlu).
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/PridaniReakceKPravidlu.eps}
+  \caption{Přidání reakce k~pravidlu (\textit{activity diagram})}
+  \label{fig:PridaniReakceKPravidlu}
+\end{figure}
+
+Pro více diagramů týkajících se návrhu aplikace vás odkazuji na přiložené CD.
+
+\subsection{Plnění požadavků}
+Souběžně s~rešeršní částí jsem se zamýšlel nad tím, jak splnit požadavek na modularitu aplikace. Jelikož jsem v~té době procházel mnoho nástrojů, které používaly konfigurační soubory pro definici podezřelých aktivit, tak jsem se rozhodl je ideálně použít také. Tím jsem splnil požadavek na modularitu aplikace. Stačí jen zajistit, aby byla aplikace dostatečně konfigurovatelná a nebyla uzavřená, co se týče definovaných formátů logů nebo pravidel, které hledají podezřelé aktivity.
+
+Po ukončení rešeršní části byl jako \uv{Korelátor událostí} zvolen program Simple Event Correlator, který jsem již představoval výše. Tento nástroj se perfektně hodí pro účel mé bakalářské práce, protože dokáže pokrýt požadavky F1, F2, F3 i F4.
+
+Začal jsem tedy detailně studovat manuálové stránky tohoto nástroje. Byl jsem unešen funkcionalitou, kterou nabízí, ale potvrdil se nedostatek, který jsem již popisoval v~rešeršní části (viz \ref{SECMinus}).
+
+SEC má předpřipravená analyzační pravidla, která dokážou pracovat s~časem, ovšem jen pro online monitorování logů. Při konzultaci s~vedoucím práce jsme se shodli, že v~praxi je ovšem daleko častější situace, kdy více zařízení loguje do sdíleného souborového systému a my bychom chtěli provádět offline analýzu pouze tam, nikoliv instalovat náš nástroj na každé zařízení.
+
+Jak je uváděno v~manuálu SEC \cite{secManPage}: \textit{\uv{Note that for event occurrence time SEC always uses the current time as returned by the time(2) system call, *not* the timestamp extracted from the event.}}. SEC tedy umožňuje offline čtení (parametr \texttt{$--$notail}), při kterém se ovšem nebere ohled na datum a čas, který je uveden v~události, ale vezme se aktuální čas v~době analýzy logů. Bylo tedy jasné, že budu muset tento nástroj lehce vylepšit, abych tento nedostatek opravil. Naplánoval jsem si, že při té příležitosti doimplementuji do SEC i požadavek F5.
+
+Aplikace LogStash (viz ELK Stack \ref{elk}) využívá takzvané \textit{Grok patterny}, které jsem objevil v~rešeršní části a byly mi inspirací k~vyřešení požadavku F6, viz \ref{aliasExample}.
+
+Požadavek F7 je nefunkční a byl klíčový pro zvolení technologie, ve které budu vytvářet GUI. Zavrhnul jsem .NET a Javu. Pro tvorbu GUI jsem zvolil \textit{framework} Qt, napsaný v~C++. SEC je napsaný v~jazyce Perl, takže také požadavek F7 splňuje. Bude se tedy jednat o~integraci C++ a Perlu.
+
+\section{Implementace}
+Implementační část měla 2 fáze:
+\begin{enumerate}
+	\item Úprava SEC -- výsledek jsem pojmenoval SEC+.
+	\item Vývoj GUI od nuly -- název celkové aplikace je \textit{Forensic Analyzer}.
+\end{enumerate}
+
+\subsection{SEC+}
+Z~oficiálních stránek \cite{secProgram} jsem si stáhnul nástroj SEC v~nejaktuálnější verzi 2.7.11. Nastudoval jsem jazyk Perl a zorientoval se v~kódu, který obsahoval cca 13 000 řádek. 
+
+Mým cílem bylo nenásilnou cestou přidat funkcionalitu, ale přitom nenarušit původní způsob používání. Začal jsem nadefinováním vlastního přepínače \texttt{$--$parseEventTime}. Jak název napovídá, pokud se objeví tento přepínač, program se bude snažit získávat čas události přímo z~dané řádky logu. Po zorientování v~kódu jsem prošel všechna systémového volání \texttt{time()} a tam, kde to bylo nutné, jsem modifikoval. Pokud je tedy definován přepínač \texttt{$--$parseEventTime}, dostanete se do mých řádek kódu, konkrétně do funkce \texttt{getEventTimeFromProcessingLine}. Jak tato funkce získá \textit{timestamp} ze zpracovávané řádky logu? 
+
+\subsubsection{Získávání timestampu z~libovolného logu}
+SEC zadává vstupní soubory pomocí přepínače \texttt{$--$input=<cesta\\ k~souboru>[=<kontext>]}. Kontext je nepovinný, může to být libovolný identifikátor, na který se poté mohou odkazovat pravidla v~konfiguraci (při každém čtení se totiž vytvoří interní kontext s~tímto názvem). \cite{secManPage} Rozhodl jsem se využít této možnosti a přidat kontextu další význam -- bude zároveň vyjadřovat název proměnné, jejíž hodnota popisuje, jak získat datum a čas z~řádky logu tohoto typu. 
+
+Tyto názvy proměnných a jejich hodnoty budou v~mnou definovaném konfiguračním souboru. Ve výchozím nastavení se jedná o~soubor \\ 
+\texttt{res/logFormats.conf} a při spuštění SEC+ již předpokládá, že existuje a obsahuje všechny potřebné proměnné (kontexty). Pokud tomu tak není, program zareaguje chybovou hláškou.
+
+Jako hodnotu proměnné očekávám regulární výraz, podle kterého dokážu z~každé události získat datum a čas. Tento regulární výraz navíc musí obsahovat tzv. \textit{named capture groups}. \cite{namedCaptureGroups} Detailní popis požadovaných skupin zde \ref{namedCaptureGroups}. Vložením \texttt{?<var>} do regulárního výrazu přikážete Perlu, aby v~případě nalezené shody uložil tuto skupinu do proměnné \texttt{\$+\{var\}}. Aplikace spoléhá na naplnění těchto proměnných, vypočítává z nich \textit{timestamp} pro každou událost. 
+
+Pro práci s~časem jsem přidal knihovnu Date::Parse. \cite{dateParse} Perl obsahuje i sofistikovanější knihovny, které dokážou odhadnout z~řetězce datum, ale tato cesta není stoprocentní a jako univerzálnější řešení mi přišlo donutit uživatele, aby mi sdělil, co kde najdu. Také je možné, že uživatel přidá svůj formát logu, ve kterém je na začátku datum a až na konci je  čas apod. Z~takové řádky by ani ty nejlepší knihovny nedokázaly jednoznačně odhadnout datum a čas.
+
+Zpátky k~funkci \texttt{getEventTimeFromProcessingLine}. Při čtení řádky vím, ze kterého je souboru a také, jaký je kontext. Pokud ještě neznám regulární výraz pro tento kontext, najdu ho v~konfiguračním souboru. Poté už snadno získám datum a čas, který vracím jako \textit{timestamp}.
+
+\subsubsection{Dodržování čtení událostí dle jejich timestampu}
+
+Tímto mělo být jednoduché rozšíření dovršeno. Při testování jsem však narazil na nečekaný problém. Pokud má SEC definováno více vstupních logů a čte je offline, pak se snaží být maximálně spravedlivý. To se projevuje tak, že pokud má dva soubory, tak vždy vezme nejprve 1. řádku z~1. logu, poté 1. řádku z~2. logu, 2. řádku z~1. logu atd. Já bych ovšem potřeboval, aby události bral v~pořadí, které respektuje čas jednotlivých událostí.
+
+První řešení, které mě napadlo, bylo předzpracovat všechny události -- vytvořit jeden sloučený vstupní log, ve kterém jsou události seřazeny. Tímto bych ovšem přišel o~již zabudovanou možnost psát pravidla, která se použijí, jen pokud se čte řádka z~konkrétního souboru. 
+
+Jelikož lze předpokládat, že jednotlivé logy jsou seřazené podle času, stačí se jen podívat na první nezpracovanou řádku v~každém logu a najít nejaktuálnější. Tuto logiku najdete ve funkci \texttt{readRecentLineToReadbuffer}. Použil jsem tedy myšlenku slévání, podobnou jaká je v~algoritmu MergeSort.
+
+Poslední zásadní část, kterou jsem musel modifikovat, je právě ukládání řádky do \textit{bufferu}, se kterým SEC pracuje. SEC čte z~každého zdroje fixní počet bajtů. Následně se snaží v~\textit{bufferu} nalézt \textit{newline}, což má mimo jiné neočekáváné chování v~situaci, kdy soubor obsahuje pouze jedinou událost bez \textit{newline}. 
+
+Jakmile naleznu událost, která má z~časového hlediska přijít nejdříve, uložím ji do \textit{bufferu} a na její místo posunu následující událost ze stejného souboru. Stačí mi tedy číst po řádcích, ne po bajtech. To byla modifikace, kterou jsem musel provést. Celá tato logika bude aplikována, pokud bude SEC+ puštěn také s~přepínačem \texttt{$--$parsedTimeOrder}. 
+
+Vytvořil jsem další oddělený přepínač, protože jsem si vědom toho, že čtení po řádcích je časově méně efektivní a pokud uživatel potřebuje pouze získávat datum a čas z~událostí a přitom nepotřebuje dodržovat jejich pořadí, potom tento parametr nebude specifikovat a dosáhne tak vyšší efektivity.
+
+Přidáním přepínače \texttt{$--$dontParseEventTime} je možné zrušit případné použítí přepínačů \texttt{$--$parseEventTime} a \texttt{$--$parsedTimeOrder}.
+
+\subsubsection{Přidání časových filtrů}
+
+Následovalo přidání posledních dvou přepínačů: \texttt{$--$timeFilterFrom} \\a \texttt{$--$timeFilterTo}, které slouží k~zahození událostí, které nastaly dříve, resp. později než zadaný \textit{timestamp}. \textit{Timestamp} vypočítám z~hodnoty tohoto přepínače, který je pro oba filtry očekáván ve formátu: \\\texttt{<měsíc>/<den>[/<rok>]:<hodin>:<minut>:<vteřin>}
+
+Kód jsem doplnil o~validace, komentáře a také jsem všechny své hlavní funkce anotoval svým jménem, aby bylo jasně poznat, co je mým dílem. Díky tomu, že jsem průběžně verzoval, jsem mohl přidat do přílohy \textit{git-diff}, který přehledně zobrazuje rozdíly naklonovaného oficiálního repozitáře SEC a mojí verze SEC+.
+
+\subsection{Forensic Analyzer}
+Hlavním cílem bylo vytvořit grafickou nadstavbu SEC+, která by umožňovala v~GUI generovat potřebné parametry, spravovat vstupní logovací soubory, editovat konfigurační soubory atd.
+
+GUI jsem se snažil navrhnout tak, aby bylo prakticky využitelné, proto jsem se rozhodl, že si \textit{Forensic Analyzer} bude i po vypnutí pamatovat již definované vstupní soubory, konfigurační soubory a aliasy. Při spuštění programu se všechny definované aliasy načtou a jsou připraveny k~použití. 
+
+Jak vstupní logovací soubory, tak konfigurační soubory, mohou být přidány nebo odebrány z~\textit{Forensic Analyzeru}. Tuto možnost jsem do nástroje přidal, aby uživatel nemusel vždy znovu definovat, který log chce použít a jaký je formát obsažených událostí. Z~tohoto důvodu je v~nástroji možnost aktivovat a deaktivovat soubor. Pokud je soubor deaktivovaný, bude při spuštění analýzy ignorován. O~dynamické přidávání a odebírání souborů se stará třída \texttt{QtFileController}.
+
+Pro modifikaci vstupního logovacího souboru jsem navrh dialog, který představuje třída \texttt{LogFileDialog}. V tomto dialogu lze změnit regulární výraz popisující formát událostí. 
+
+Protože formát může být velice komplikovaný a nepřeledný, je v~tomto dialogu také možnost používat a editovat aliasy (více viz \ref{aliasExample}).
+
+Třída \texttt{CAliasManager} spravuje také druhý seznam aliasů, který můžete nalézt při modifikaci konfiguračního souboru -- tento dialog je implementován třídou \texttt{ConfigFileDialog}.
+Na rozdíl od dialogu pro správu logů zde lze přímo editovat obsah souboru. 
+
+Rozhodl jsem se, nad rámec sjednaného rozsahu, přidat generování pravidel, které SEC poskytuje. Uživatel si zvolí typ pravidla a \textit{Forensic Analyzer} dokáže následně vygenerovat všechna povinná pole, která musí být definována pro daný typ pravidla.
+
+Hlavní okno aplikace jsem navrhnul responzivně a slouží k~přehledu aktivních souborů a parametrů pro SEC+, k~samotnému spuštění analýzy a k~zobrazení nalezených výsledků.
+
+Poslední zmíněná, ovšem ne co do důležitosti, je třída \texttt{CModel}, která spravuje zejména aktivní a neaktivní soubory a generuje parametry pro SEC+.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/ClassDiagramSimple.eps}
+  \caption{Zjednodušený \textit{class diagram}}
+  \label{fig:ClassDiagramSimple}
+\end{figure}
+
+Na obrázku \ref{fig:ClassDiagramSimple} můžete vidět zjednodušený \textit{class diagram} \textit{Forensic Analyzeru}. Tento graf zobrazuje zmiňované třídy a jejich vzájemné závislosti. Třídy označené oranžově jsou vázány na konkrétní formuláře, které jsem vytvořil ve vývojovém prostředí Qt Creator. Zeleně vyznačené jsou naopak klasické C++ třídy. 
+
+Pro detailnější popis implementace nebo diagramy vřele doporučuji vygenerovat programátorskou příručku pomocí nástroje Doxygen (viz \ref{makefile}).
+
+Za zmínku stojí, jak jsem vyřešil integraci \textit{Forensic Analyzeru} a SEC+. Jakmile uživatel spustí analýzu, \textit{Forensic Analyzer} vygeneruje \textit{shellový} příkaz pro spuštění SEC+ se správnými parametry. Poté vytvoří nový proces pro SEC+ a přesměruje se jeho standardní výstup na zápisový konec nepojmenované roury. Na čtecím konci roury je připojen \textit{Forensic Analyzer}, který data zobrazuje v~GUI. Využil jsem knihovní funkci POSIXu -- \texttt{popen}. \cite{popen}
+
+\chapter{Instalační a uživatelská příručka}
+%\input{InstalacniAUzivatelskaPrirucka}
+\section{Instalační příručka}
+\subsection{Požadavky}
+Aplikace \textit{Forensic Analyzer} je určená pro operační systém Linux. Pro úspěšnou instalaci je potřeba mít nainstalované tyto balíčky:
+\begin{itemize}
+	\item make
+	\item g++
+	\item qt-sdk
+	\item doxygen
+	\item graphviz
+\end{itemize}
+
+Balíček instalujte příkazem: \texttt{sudo apt-get install <název balíčku>}
+
+\subsection{Instalace}
+Pro instalaci otevřete příkazový řádek v~adresáři se souborem \texttt{Makefile } a zadejte příkaz \texttt{make}.
+Součástí instalace je také snaha přiřadit práva na spouštění přidružené aplikace SEC+ s~relativní adresou \texttt{./res/sec+}. Tento soubor, prosím, nemažte ani jej nepřesouvejte na jiné umístění.
+
+\subsection{Možnosti Makefilu}
+\label{makefile}
+\texttt{Makefile} má definováno více zajímavých návěští, které můžete připsat za \texttt{make}:
+\begin{itemize}
+	\item all -- Výchozí návěští, pokud není explitně specifikováno jinak. Nainstaluje aplikaci a vygeneruje programátorskou příručku.
+	\item run -- Spustí aplikaci. Při spuštění již nejsou potřeba administrátorská práva.
+	\item doc -- Vygeneruje programátorskou příručku do složky \texttt{doc}. Pro spuštění HTML verze příručky otevřete soubor \texttt{doc/index.html}.
+	\item count -- Počítá počet řádků kódu všech souborů s~příponami \texttt{.h} a \texttt{.cpp}
+	\item clean -- Odinstaluje aplikaci a odstraní programátorskou příručku.
+\end{itemize}
+
+Př.:
+Pouze pro vygenerování programátorské příručky zadejte: \texttt{make doc}
+
+\section{Uživatelská příručka}
+\subsection{Hlavní obrazovka}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/HlavniObrazovka.eps}
+  \caption{Hlavní okno aplikace}
+  \label{fig:HlavniOkno}
+\end{figure}
+
+Po spuštění \textit{Forensic Analyzeru} se dostanete na hlavní obrazovku, viz \ref{fig:HlavniOkno}.
+
+Tato hlavní obrazovka je rozdělena na dvě části:
+\begin{enumerate}
+	\item Část s~parametry, které definují, jak bude forenzní analýza probíhat.
+	\item Okno pro zobrazení výsledků, ať už čistě pro zobrazení nalezených korelací nebo detailnější záznam průběhu analýzy.
+\end{enumerate}
+
+Až budete mít všechny parametry specifikované, stiskněte tlačítko \texttt{START ANALYZING}, popřípadě klávesovou zkratku \texttt{Ctrl + R}. Následně proběhne forenzní analýza zadaných logů dle definovaných konfiguračních souborů. Po dokončení analýzy se objeví výsledky a informace o~době běhu.
+
+\subsubsection{Parametry Forensic Analyzeru}
+Parametry jsou logicky rozdělené do 4 kategorií:
+\begin{enumerate}
+	\item Parametry popisující jaké jsou vstupní logovací soubory, ve kterých se budou podezřelé aktivity hledat.
+	\item Parametry popisující z~jakých konfiguračních souborů se bude vytvářet sada pravidel, která definuje podezřelé aktivity.
+	\item Fixní parametry, což jsou přednastavené parametry, které zaručují správnou funkcionalitu pro offline analýzu logů.
+	\item Volitelné parametry, které slouží pro pokročilé uživatele se znalostmi další parametrizace aplikace SEC, které zde lze uplatnit. 
+\end{enumerate}
+
+Můžete si všimnout, že parametry z~kategorie 1--3 jsou šedé. To značí, že je nelze ručně editovat. Generují se automaticky dle aktuálního stavu aplikace.
+
+Parametry z~kategorie 4 je možné editovat. Lze použít veškeré parametry příkazové řádky, které podporuje nástroj SEC -- viz \cite{secProgram, secManPage}. Ve výchozím nastavení je nastaven parametr \texttt{$--$intvents}, který vynutí generování interních událostí SEC, kterých lze také využívat při psaní pravidel v~konfiguračních souborech.
+
+\subsubsection{Menu lišta a panel nástrojů}
+Panel nástrojů poskytuje rychlejší přístup k~některým prvkům menu lišty. Tento panel nástrojů není fixní a lze jej přemístit na jiný okraj aplikace. Většina operací, které zde nebo v~menu najdete, má přiřazené alternativní klávesové zkratky, které mohou zrychlit používání aplikace.
+
+V~menu se nachází možnost specifikovat časové filtry, které umožní definovat interval, ve kterém chcete hledat podezřelé aktivity a jejich korelace. Události mimo tento interval budou ignorovány.
+Pomocí kalendáře lze specifikovat horní nebo dolní mez, popřípadě obě současně.
+
+Další položkou je volba podrobnosti výpisu. Čím vyšší úroveň, tím více informací o~průběhu analýzy bude zobrazeno. Výchozím nastavením je úroveň 3. Úroveň 1 zobrazuje pouze nalezené podezřelé aktivity a druhým extrémem je úroveň 6, která detailně popisuje všechny důležité momenty analýzy.
+
+Jak podrobnost výpisu, tak časové filtry se připisují do parametrů kategorie 3. Pokud budete chtít přidávat parametry kategorie 4 může být praktické si zobrazit veškerou dostupnou parametrizaci SEC+ (například pomocí klávesové zkratky \texttt{Ctrl + U}).
+
+Zbývají 2 nejdůležitější položky menu, které si rozebereme podrobněji.
+
+\subsection{Správa vstupních logovacích souborů}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/DialogVstupniSoubor.eps}
+  \caption{Dialog se vstupním logovacím souborem}
+  \label{fig:DialogVstupniSoubor}
+\end{figure}
+
+V~první záložce na hlavním okně naleznete přehled aktivních a neaktivních vstupních logů. Aktivní logy jsou zaškrtnuté a tedy se také nachází v~parametrech kategorie 1. První tři akce tohoto menu jsou vyhrazené pro možnost přidat, editovat nebo smazat vstupní log. Akce smazat log (popřípadě konfigurační soubor) pouze odstraní evidenci tohoto souboru z~aplikace, neprovádí fyzické smazání z~disku.
+
+Pokud zvolíte akci přidat log, zobrazí se vám dialog, ve kterém vyberte logovací soubor, který budete chtít zkoumat. Následovat bude dialog z~obrázku \ref{fig:DialogVstupniSoubor}, ve kterém je potřeba doplnit potřebné informace o~logovacím souboru.
+
+\subsubsection{Aliasy}
+Největší část je věnována pro uživatelem definované aliasy, které slouží k zjednodušení a zvýšení přehlednosti zápisu regulárních výrazů. 
+
+Alias se definuje zápisem \texttt{\$\{<jmémo proměnné>\}=<hodnota>}. Vyhodnocování probíhá rekurzivně, dokud \texttt{<hodnota>} není obyčejný řetězec.
+
+\begin{lstlisting}[frame=single,caption=Příklad definice tří aliasů, label=aliasExample]
+${SECOND}=(?<second>([0-5]?[0-9]|60)([:.,][0-9]+)?)
+${MINUTE}=(?<minute>[0-5][0-9])
+${TIME}=(?<hour>2[0123]|[01]?[0-9]):${MINUTE}:${SECOND}
+\end{lstlisting}
+
+\subsubsection{Popis data a času}
+\label{namedCaptureGroups}
+Je nutné specifikovat regulární výraz, podle kterého bude možné z~každé události získat datum a čas. Tento regulární výraz navíc musí obsahovat tzv. \textit{named capture groups}. \cite{namedCaptureGroups}
+
+Vyžaduji specifikovat přesně tyto skupiny:
+\begin{itemize}
+	\item year\footnote{Tato skupina je nepovinná.}
+	\item month
+	\item day
+	\item hour
+	\item minute
+	\item second
+\end{itemize}
+
+Každá skupina musí být obalena zleva \texttt{?<} a zprava \texttt{>}.
+
+\begin{lstlisting}[frame=single,caption=Příklad regulárního výrazu získávájící datum a čas z~události, label=regExpExample]
+(?<month>(0?[1-9]|1[0-2]))\s+(?<day>[1-9]|0[1-9]|
+[12]\d|3[01])\s+(?<hour>2[0123]|[01]?[0-9]):(?<minute>
+[0-5][0-9]):(?<second>([0-5]?[0-9]|60)([:.,][0-9]+)?)
+\end{lstlisting}
+
+Pokud bude skupina pojmenovaná například \texttt{month}, aplikace očekává, že v~této skupině nalezne údaj o~tom, jaký je právě měsíc. Nemusí to být ovšem jen číselná informace. Validní je také například \uv{Jan} nebo \uv{January}. 
+
+Pojmenovaná skupina \texttt{year} je jediná nepovinná, protože některé logy zkrátka rok neevidují. Pokud tato informace není dostupná, aplikace vezme nejpravděpodobnější rok dle dnešního data. Pokud je například 16. dubna 2017 a bude analyzován log, ve kterém je měsíc specifikován jako \uv{Nov}, pak aplikace vyhodnotí, že se jedná o~listopad roku 2016, ne roku 2017.
+
+Lze zde využít výše zmíněné aliasy.
+
+\subsubsection{Formát logu}
+V~horní části okna se nachází další dvě pole. V~prvním je absolutní cesta k~právě spravovanému souboru. V~druhém poli je generovaný název formátu logu, pro který se automaticky vytváří alias \texttt{\$\{<název formátu>\}=<zadaný vstup od uživatele>}, který bude možné použít později pro jiný logovací soubor stejného formátu.
+
+\subsubsection{Uložení změn a ukončení}
+Uložení změn v~tomto okně se provede příslušným tlačítkem \texttt{SAVE ALL + CLOSE}, případně klávesovou zkratkou \texttt{Ctrl + S}. Pokud okno zavřete křížkem v~pravém horním rohu, změny nebudou uloženy.
+
+Nově přidaný log je automaticky považován za aktivní.
+
+\subsection{Správa konfiguračních souborů}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/DialogKonfiguracniSoubor.eps}
+  \caption{Dialog s~konfiguračním souborem}
+  \label{fig:DialogKonfiguracniSoubor}
+\end{figure}
+
+Logika správy konfiguračních souborů je velice podobná správě vstupních logovacích souborů. Zmíním tedy jen odlišnosti.
+
+Na obrázku \ref{fig:DialogKonfiguracniSoubor} je zachycen dialog po výběru konfiguračního souboru.
+Vpravo naleznete opět seznam aliasů. Tyto aliasy jsou oddělené od předchozích a lze je uplatnit v~levé části, která zobrazuje obsah daného konfiguračního souboru.
+
+\subsubsection{Pravidla z~konfiguračního souboru}
+Jednotlivá pravidla musí být oddělena minimálně jedním prázdným řádkem. Pravidla mohou být různých typů, viz \cite{secManPage}. Lze si zvolit typ pravidla, které chcete přidat, a kliknout na tlačítko \texttt{Generate}, popřípadě stisknout klávesovou zkratku \texttt{Ctrl + G}. Takto je možné vygenerovat všechny povinné položky, které dané pravidlo vyžaduje specifikovat. 
+
+Můžete si všimnout, že je automaticky generována akce \uv{\texttt{write -}}\footnote{Spojovník (\texttt{-}) je zkratka pro standardní výstup. \\Akce \texttt{write} má signaturu: \texttt{write <soubor> [<obsah>]}. Podrobněji zde \cite{secManPage}.}. Tuto akci nemažte, jinak hledanou podezřelou aktivitu program sice nalezne, ale v~přehledu ji nezobrazí. Je možné přidávat více akcí, stačí je oddělovat středníkem.
+
+\subsection{Zálohovací soubory}
+Aplikace si i po vypnutí pamatuje mnoho informací z~předchozího běhu a automaticky je načítá při spuštění. Jedná se například o~seznam definovaných logovacích a konfiguračních souborů nebo seznam definovaných aliasů. Tato evidence je uložena v~zálohovacích souborech ve složce \texttt{backup}. \\Pokud chcete rychle získat čistou verzi \textit{Forensic Analyzeru}, můžete celou tuto složku smazat. Aplikace je ovšem dodána s~přednastavenými aliasy, které by byla  škoda nevyužít.
+
+\chapter{Testování}
+Pro účel testování jsem připravil aliasy pro všechny typy logovacích souborů, které mi vedoucí práce poskytl. Přidání těchto logů do \textit{Forensic Analyzeru} bude tedy triviální (postupujte analogicky k~obrázku \ref{fig:DialogVstupniSoubor}). Tyto logy najdete na přiloženém CD ve složce \texttt{examples/inputLogFiles}. 
+
+Ve složce \texttt{examples} je také složka \texttt{configFiles}, která obsahuje příklady jednotlivých pravidel včetně vysvětlivek. Ukázkové konfigurační soubory lze aplikovat na log \texttt{examples/inputLogFiles/secRulesExamples.log}, který demostruje použítí různých typů pravidel. Můžete se přesvědčit, že \textit{Forensic Analyzer} zachovává původní způsob používání programu Simple Event Correlator a navíc umožňuje offline práci s~časem, řazení událostí, filtry apod.
+
+Nyní je potřeba dalšími pravidly popsat, co je podezřelá aktivita ve vašem kontextu. Podařilo se mi vytvořit jeden univerzální konfigurační soubor, podle kterého se bude hledat korelace IP adres napříč libovolnými logy, které do \textit{Forensic Analyzeru} přidáte. Tento konfigurační soubor vytváří přehled, ze kterého je patrná aktivita jednotlivých uživatelů. Můžete si ho detailně prohlédnout na obrázku \ref{associatedActivitiesAcrossAllLogs}.
+
+
+První pravidlo shlukuje události, které obsahují stejnou IP adresu. Toho dosahuje pomocí kontextů a takzvaného \textit{event store}, který má každý kontext k~dispozici. Za zmínku stojí také praktické využití aliasu \texttt{\${IP}}, který bude po vyhodnocení popisovat vzor tohoto pravidla sice komplexním, ale poměrně nepřehledným způsobem (viz \texttt{backup/formatAliasesBackup.txt}).
+
+Druhé pravidlo demonstruje integraci Perlu. Využívá tzv. interních událostí, které jsou generovány pouze s~přepínačem \texttt{$--$intevents}. S~tímto přepínačem bude po přečtení všech logovacích souborů vyvolána interní událost \texttt{SEC\_SHUTDOWN}, na kterou přesně druhé pravidlo čeká. Úkolem tohoto pravidla je vytvořit výpis, který bude zobrazen uživateli.
+
+\begin{lstlisting}[frame=single,caption=Konfig. soubor  \texttt{associatedActivitiesAcrossAllLogs.conf},label=associatedActivitiesAcrossAllLogs]
+type = Single
+ptype = RegExp
+pattern =  (${IP})
+desc = $0
+action = add context_$1 $0
+
+type = Single
+ptype = SubStr
+pattern = SEC_SHUTDOWN
+context = SEC_INTERNAL_EVENT
+desc = SEC_SHUTDOWN triggered!
+action = lcall %ret -> ( sub { \
+  print "List of activities across all log files by \
+  IP:\n"; \
+  foreach $contextName (keys %main::context_list) { \
+      if ($contextName ne "SEC_INTERNAL_EVENT") { \
+      print "\n".substr($contextName, 8).":\n"; \
+      foreach $event (@{ \
+      	$main::context_list{$contextName}->{"Buffer"} \ 
+      }){ \
+        print "$event\n"; \
+      } } } } )
+\end{lstlisting}
+
+V~rámci testování doby běhu jsem použil tento konfigurační soubor, který jsem aplikoval na různě veliké logovací soubory \texttt{apache-access<počet řádek logu>.log}. Naměřené zprůměrované výsledky jsou v~tabulce \ref{testingTable}.
+
+Doba běhu je udávána ve formátu: \texttt{<minuty>:<sekundy>:<milisekundy>} \\ \texttt{[<odpovídající přepočet na milisekundy>]}. 
+
+V~tabulce \ref{testingTable} jsou tři sloupce. V~každém sloupci se jedná o~testování s~jinou parametrizací nástroje \textit{Forensic Analyzer}.
+\begin{enumerate}
+	\item{SEC -- V~tomto případě byla prováděna forenzní analýza s~volitelným parametrem \texttt{$--$dontParseEventTime}. Připomínám, že pomocí tohoto přepínače lze zrušit fixní parametry \texttt{$--$parseEventTime} a \texttt{$--$parsedTimeOrder}, tedy lze vynutit nasimulování původního programu Simple Event Correlator (odtud i název sloupce).}
+	\item{FA -- FA je zkratka pro \textit{Forensic Analyzer}. Analýza spouštěna s~prázdnými volitelnými parametry. Jedná se o~výslednou složitost vytvořeného nástroje \textit{Forensic Analyzer}. Doba běhu této mé nadstavby je zhruba 150\% vůči původní nerozšířené verzi SEC. Za tento nárůst časové složitosti získáte mnohem lepší offline analýzu -- \textit{timestamp} je možné získávat přímo z~události v~logu, události je možné brát spravedlivě v~pořadí dle původních časových značek, možnost filtrovat události a v~neposlední řadě využívat GUI, které značně usnadňuje tvorbu pravidel a generování parametrů.}
+	\item{FA + výpis -- V~tomto testování jsem přidal přepínač \texttt{$--$intevents} do volitelných parametrů. Na rozdíl od obou předchozích se pouze v~tomto případě vypíše přehled, ze kterého je patrná aktivita jednotlivých uživatelů. Tento sloupec reprezentuje reálnou složitost, tedy k~složitosti forenzní analýzy je nutné navíc připočítat složitost zobrazení výstupu v~GUI. Doba běhu vychází přibližně 200\% ve srovnání s~předchozí parametrizací. Nutno podotnout, že tento dvojnásobný nárůst časové složitosti je způsoben tím, že tento konfigurační soubor generuje velké množství výstupů. Pokud v~akci \texttt{write} nahradíte standardní výstup například souborem, budete se spíše blížit složitosti z~předchozího bodu.}
+\end{enumerate}
+
+Na obrázku \ref{fig:GraphTestingFA} je graf, který odráží tabulku \ref{testingTable}. 
+
+Podařilo se mi vytvořit nástroj, který zachovává lineární asymptotickou časovou složitost.
+
+\newpage
+
+\begin{table}[t]
+\centering
+\caption{Testování doby běhu dle různého počtu zpracovaných událostí}
+\label{testingTable}
+\begin{tabular}{|c|l|l|l|}
+\hline
+\textbf{\# řádek} & \multicolumn{1}{c|}{\textbf{FA+výpis {[}$\sim$ms{]}}} & \multicolumn{1}{c|}{\textbf{FA {[}$\sim$ms{]}}} & \multicolumn{1}{c|}{\textbf{SEC {[}$\sim$ms{]}}} \\ \hline
+5 & 00:03:073 {[}3073{]} & 00:00:076 {[}76{]} & 00:00:078 {[}78{]} \\ \hline
+1000 & 00:03:482 {[}3482{]} & 00:00:266 {[}266{]} & 00:00:187 {[}187{]} \\ \hline
+10000 & 00:07:775 {[}7775{]} & 00:02:148 {[}2148{]} & 00:01:242 {[}1242{]} \\ \hline
+50000 & 00:22:576 {[}22576{]} & 00:09:658 {[}9658{]} & 00:06:118 {[}6118{]} \\ \hline
+100000 & 00:40:702 {[}40702{]} & 00:19:228 {[}19228{]} & 00:12:192 {[}12192{]} \\ \hline
+250000 & 01:33:342 {[}93342{]} & 00:48:096 {[}48096{]} & 00:31:467 {[}31467{]} \\ \hline
+500000 & 03:08:169 {[}188169{]} & 01:43:359 {[}103359{]} & 01:05:036 {[}65036{]} \\ \hline
+750000 & 04:42:437 {[}282437{]} & 02:39:169 {[}159169{]} & 01:39:424 {[}99424{]} \\ \hline
+1000000 & 06:25:019 {[}385019{]} & 03:23:425 {[}203425{]} & 02:13:160 {[}133160{]} \\ \hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{res/GraphTestingFA.pdf}
+  \caption{Graf porovnávající dobu běhu dle počtu zpracovaných událostí a použité parametrizace vytvořeného nástroje}
+  \label{fig:GraphTestingFA}
+\end{figure}
+
+\chapter{Zhodnocení}
+V~souladu se zadáním práce jsem nejprve nastudoval literaturu s~problematikou logů a forenzní analýzy. V~aplikaci Enterprise Architect jsem po konzultaci s~vedoucím práce zachytil seznam požadavků, sestavil model případů užití a namodeloval diagramy aktivit. Poté jsem v~rešeršní části prošel mnoho nástrojů a vybral jsem nejvhodnějšího kandidáta -- Simple Event Correlator. 
+
+Tento nástoj jsem úspěšně rozšířil, přičemž jsem zachoval původní funkcionalitu a způsob používání. Z~tohoto důvodu se domnívám, že bych mohl vytvořit \textit{pull request} do originálního projektu na Githubu s~vysokou šancí začlenění mých změn do programu Simple Event Correlator. S~cílem zvládnout toho rozšíření jsem se musel detailně seznámit s~dokumentací tohoto nástroje \cite{secManPage}, zorientovat se v~kódu, který čítal cca 13 000 řádek, a nastudovat samotný jazyk Perl, ve kterém je tato aplikace napsaná.
+Rozšíření přináší podporu pro offline forenzní analýzu, která zkoumá \textit{timestamp} jednotlivých událostí.
+
+Dále jsem si vyzkoušel také vývoj od nuly. Vytvořil jsem grafickou nadstavbu, která značně usnadňuje tvorbu pravidel, umožňuje používat aliasy, pamatuje si již použité logovací nebo konfigurační soubory, generuje parametry a celkově odstiňuje uživatele od příkazové řádky.
+
+K~tomuto softwaru jsem vytvořil dokumentaci, která zahrnuje programátorskou, instalační a uživatelskou příručku. 
+
+Při testování se ukázalo, že můj produkt má lineární časovou složitost vůči počtu zpracovaných událostí.
+
+Ve výsledku vznikl volně šiřitelný nástroj \textit{Forensic Analyzer}, který umožňuje analyzovat podezřelé aktivity na serveru. 
+
+\begin{conclusion}
+
+Cílem této práce bylo navrhnout nástroj, který dokáže spojit více logů a zobrazit přehled podezřelých aktivit. Nástroj byl úspěšně navržen a implementován, všechny požadavky, které byly na aplikaci kladeny, byly splněny. 
+
+Pomocí konfiguračních souborů je možné dodefinovat pravidla popisující podezřelé aktivity a jaká reakce se má provést, pokud k~této aktivitě dojde. Aplikace je připravena na přidání nového logovacího souboru s~atypickým formátem a podporuje také základní formáty serverových logů, se kterými jsem se seznámil a vytvořil analýzu využitelnosti obsažených údajů.
+Sepsal jsem podrobnou uživatelskou dokumentaci a předpřipravil ukázky pravidel, které hledají různé korelace. Nakonec byl nástroj podroben testování.
+
+Výsledkem práce je funkční aplikace, která zjednodušuje bezpečnostní analýzu serverových logů. Poskytuje rozsáhlé možnosti konfigurace, její modularita umožňuje praktické využití a otevírá možnosti k~dalšímu rozříření.
+
+\section{Možnosti budoucího rozvoje}
+Podařilo se mi vytvořit plně funkční aplikaci, ačkoli zadání požadovalo pouze prototyp aplikace. Nicméně prostory k~vylepšení vidím v~grafickém uživatelském rozhraní. Napadlo mě například přidat generování grafických přehledů podezřelých aktivit, které byly odhaleny při forenzní analýze.
+
+\end{conclusion}
+
+
+%\renewcommand{\refname}{Seznam literatury}
+%\newpage
+\bibliographystyle{csn690}
+\begin{thebibliography}{9}
+	
+	\bibitem{logManagement}
+	CHUVAKIN, Anton., SCHMIDT, Kevin J., PHILLIPS, Chris a MOULDER, Patricia. \textit{Logging and log management: the authoritative guide to understanding the concepts surrounding logging and log management}. Amsterdam: Elsevier/Syngress, 2013. ISBN 1597496359.
+			
+	\bibitem{auditAndTrace}
+	MAIER, Phillip Q. \textit{Audit and trace log management: consolidation and analysis}. Boca Raton, FL: Auerbach Publications, 2006. ISBN 978-0849327254.			
+	
+	\bibitem{forensicWithOpenSource}
+	ALTHEIDE, Cory. a CARVEY, Harlan A. \textit{Digital forensics with open source tools}. Burlington, MA: Syngress, 2011. ISBN 978-1597495868.
+			
+	\bibitem{bpLacina}
+	LACINA, Miroslav. \textit{Agregace a prohledávání poštovních logů}. Praha, 2014. bakalářská práce. České vysoké učení technické v~Praze, fakulta Informačních technologií. vedoucí práce Ing. Jan Baier 
+
+	\bibitem{insiderThreatDetection}
+	AMBRE, Amruta a SHEKOKAR, Narendra. \textit{Insider Threat Detection Using Log Analysis and Event Correlation}. Procedia Computer Science [online]. 2015, 436-445 [cit. 11. prosince 2016]. DOI: 10.1016/j.procs.2015.03.175. ISSN 18770509. Dostupné z: \url{http://linkinghub.elsevier.com/retrieve/pii/S1877050915004184}
+	
+	\bibitem{searchLogAnalysis}
+	JANSEN, Bernard J. \textit{Search log analysis: What it is, what's been done, how to do it}. Library \& Information Science Research [online].  2006, 407–432 [cit. 2. dubna 2017]. ISSN 0740-8188. Dostupné z: \url{http://www.sciencedirect.com/science/article/pii/S0740818806000673}
+	
+	\bibitem{secProgram}
+	VAARANDI, Risto. \textit{SEC - simple event correlator v2.7.11} [software].  3. února 2017. Dostupné z: \url{http://simple-evcorr.github.io/}. Požadován Perl 5.8 a vyšší
+	
+	\bibitem{secManPage}
+	VAARANDI, Risto. \textit{SEC manpage} [online]. 2017. [cit. 2. dubna 2017]. Dostupné z: \url{http://simple-evcorr.github.io/man.html}
+	
+	\bibitem{secBestPractices}
+	VAARANDI, Risto. \textit{Simple Event Correlator - Best Practices for Creating Scalable Configurations} [online]. 2015. [cit. 2. dubna 2017]. Dostupné z: \url{http://ristov.github.io/publications/cogsima15-sec-web.pdf}
+	
+	\bibitem{usingSEC}
+	LANG, David. \textit{Using SEC} [online]. 2013. [cit. 2. dubna 2017]. Dostupné z: \url{https://www.usenix.org/system/files/login/articles/09_lang-online.pdf}
+	
+	\bibitem{commonLogfileFormat}
+	\textit{Logging Control In W3C httpd} [online]. World Wide Web Consortium. 1995.
+	[cit. 2. dubna 2017]. Dostupné z: \url{https://www.w3.org/Daemon/User/Config/Logging.html#common-logfile-format}
+		
+	\bibitem{linuxLogFiles}
+	\textit{LinuxLogFiles} [online]. Official Ubuntu Documentation. (2015). [cit. 8. dubna 2017]. Dostupné z: \url{https://help.ubuntu.com/community/LinuxLogFiles#Authorization_Log}
+	
+	\bibitem{logFiles}
+	\textit{Log Files} [online]. The Apache Software Foundation. [cit. 8. dubna 2017]. Dostupné z: \url{https://httpd.apache.org/docs/1.3/logs.html}
+	
+	\bibitem{modLogConfig}
+	\textit{Apache Module mod\_log\_config} [online]. The Apache Software Foundation. [cit. 8. dubna 2017]. Dostupné z: \url{http://httpd.apache.org/docs/current/mod/mod_log_config.html}
+	
+	\bibitem{modSecurityAnalysis}
+	\textit{Linux : ModSecurity log analysis with Modgrep} [online]. The Endless Geek. (2014). [cit. 8. dubna 2017]. Dostupné z: \url{http://endlessgeek.com/2014/02/search-modsecurity-audit-log-analysis}
+	
+	\bibitem{modSecurityDataFormats}
+	\textit{ModSecurity 2 Data Formats} [online]. SpiderLabs. (2012). [cit. 8. dubna 2017]. Dostupné z: \url{https://github.com/SpiderLabs/ModSecurity/wiki/ModSecurity-2-Data-Formats}
+	
+	\bibitem{Fail2BanSetup}
+	\textit{Fail2Ban setup for Apache} [online]. miniwark. (2013). [cit. 9. dubna 2017]. Dostupné z: \url{https://github.com/miniwark/miniwark-howtos/wiki/Fail2Ban-setup-for-Apache}
+	
+	\bibitem{dpkg}
+	\textit{dpkg man page} [online]. Ubuntu Manpage Repository. [cit. 9. dubna 2017]. Dostupné z: \url{http://manpages.ubuntu.com/manpages/xenial/man1/dpkg.1.html}
+	
+	\bibitem{xpoLog}
+	\textit{XpoLog Center Log Management Solution} [online]. XpoLog.com. (2009). [cit. 9. dubna 2017]. Dostupné z: \url{http://www.cressidatechnology.com/pdfs/products/xplg/XpoLogCenterBro.pdf}
+	
+	\bibitem{clicktracks}
+	\textit{ClickTracks Optimizer} [online]. clicktracks.com. [cit. 9. dubna 2017]. Dostupné z: \url{http://www.clicktracks.com/products/optimizer/index.php}
+	
+	\bibitem{rConvlog}
+	\textit{RConvlog - CONVLOG replacement} [online]. Rebex Labs. (2014). [cit. 9. dubna 2017]. Dostupné z: \url{https://labs.rebex.net/RConvLog}
+	
+	\bibitem{chainsaw}
+	\textit{Chainsaw v2} [online]. The Apache Software Foundation. (2007). [cit. 13. dubna 2017]. Dostupné z: \url{https://logging.apache.org/chainsaw}
+	
+	\bibitem{docker}
+	\textit{Docker Operational Intelligence} [online]. Sematext Cloud. [cit. 13. dubna 2017]. Dostupné z: \url{https://sematext.com/docker}
+	
+	\bibitem{webalizer}
+	BARRETT, Bradford L. \textit{The Webalizer} [online]. webalizer.org. (2014). [cit. 13. dubna 2017]. Dostupné z: \url{http://www.webalizer.org}
+	
+	\bibitem{webalizerReadme}
+	BARRETT, Bradford L. \textit{The Webalizer - A~web server log file analysis tool} [online]. mrunix.net. (Copyright 1997-2013). [cit. 13. dubna 2017]. Dostupné z: \url{ftp://ftp.mrunix.net/pub/webalizer/README}
+	
+	\bibitem{logwatch}
+	DOČEKAL, Michal. \textit{Správa linuxového serveru: Sledování logů pomocí nástroje logwatch} [online]. linuxexpres. (2011). [cit. 13. dubna 2017]. Dostupné z: \url{https://www.linuxexpres.cz/praxe/sprava-linuxoveho-serveru-sledovani-logu-pomoci-logwatch}
+		
+	\bibitem{openSourceLogging}
+	PARSONS, Trevor. \textit{The Pros and Cons of Open Source Logging} [online]. logentries. (2014). [cit. 14. dubna 2017]. Dostupné z: \url{https://blog.logentries.com/2014/09/the-pros-and-cons-of-open-source-logging}		
+	
+	\bibitem{grok}
+	\textit{A~Beginner’s Guide to Logstash Grok} [online]. logz.io. [cit. 14. dubna 2017]. Dostupné z: \url{https://logz.io/blog/logstash-grok}
+		
+	\bibitem{elkStack}
+	\textit{The Complete Guide to the ELK Stack} [online]. logz.io. [cit. 14. dubna 2017]. Dostupné z: \url{https://logz.io/learn/complete-guide-elk-stack}
+	
+	\bibitem{tripwireVsOssec}
+	\textit{Tripwire Open Source vs OSSEC : Which Is Right For You?} [online]. UpGuard. (2015). [cit. 14. dubna 2017]. Dostupné z: \url{https://www.upguard.com/articles/tripwire-open-source-vs.-ossec-which-is-right-for-you}
+	
+	\bibitem{openNMS}
+	\textit{OpenNMS (Open Network Management System)} [online]. searchnetworking.techtarget.com. (2006). [cit. 14. dubna 2017]. Dostupné z: \url{http://searchnetworking.techtarget.com/definition/OpenNMS}
+	
+	\bibitem{loghound}
+	VAARANDI, Risto. \textit{loghound} [online]. ristov.github.io. (2004). [cit. 14. dubna 2017]. Dostupné z: \url{http://ristov.github.io/loghound/loghound.html}
+	
+	\bibitem{namedCaptureGroups}
+	\textit{perlre -- Capture Groups} [online]. Perl Programming Documentation. [cit. 16. dubna 2017]. Dostupné z: \url{https://perldoc.perl.org/perlre.html#Capture-groups}
+	
+	\bibitem{popen}
+	\textit{popen - initiate pipe streams to or from a process} [online]. The Open Group. (Copyright 1997) [cit. 16. dubna 2017]. Dostupné z: \url{http://pubs.opengroup.org/onlinepubs/007908799/xsh/popen.html}
+	
+	\bibitem{dateParse}
+	BARR Graham, The Comprehensive Perl Archive Network. \textit{TimeDate-2.30 , Date::Parse} [software]. (Copyright 1995-2009). Dostupné z: \url{http://search.cpan.org/~gbarr/TimeDate-2.30/lib/Date/Parse.pm}
+		
+\end{thebibliography}
+%\bibliography{mybibliographyfile}
+
+\appendix
+
+\chapter{Seznam použitých zkratek}
+% \printglossaries
+
+\begin{description}
+	\item[CLI] Command-Line Interface
+	\item[CLF] Common Log Format
+	\item[CRUD] Create, Read, Update and Delete
+	\item[GUI] Graphical User Interface
+	\item[HIDS] Host-based Intrusion Detection Systems	
+	\item[HTML] HyperText Markup Language
+	\item[HTTPD] HyperText Transfer Protocol Daemon 
+	\item[IP] Internet Protocol
+	\item[OS] Operating System
+	\item[POSIX] Portable Operating System Interface
+	\item[SIEM] Security Information and Event Management
+	\item[SQL] Structured Query Language
+	\item[SEC] Simple Event Correlator
+	\item[SSH] Secure Shell
+	\item[XML] Extensible Markup Language
+	
+\end{description}
+
+
+\chapter{Obsah přiloženého CD}
+\begin{figure}
+	\dirtree{%
+		.1 backup\DTcomment{zálohovací soubory \textit{Forensic Analyzeru}}.	
+		.1 examples\DTcomment{příklady použítí \textit{Forensic Analyzeru}}.	
+		.2 configFiles\DTcomment{příklady konfiguračních souborů}.
+		.2 inputLogFiles\DTcomment{příklady logovacích souborů}.
+		.1 man\DTcomment{instalační a uživatelská příručka}.
+		.1 other.
+		.2 bin\DTcomment{spustitelná forma implementace}.
+		.2 enterpriseArchitect\DTcomment{Enterprise Architect dokumentace}.
+		.2 gitDiffSEC+\DTcomment{porovnání SEC+ s oficiální verzí SEC}.
+		.1 res\DTcomment{významné soubory pro \textit{Forensic Analyzer}}.
+		.2 sec+\DTcomment{program SEC+ (součást \textit{Forensic Analyzeru})}.
+		.1 src\DTcomment{zdrojové kódy \textit{Forensic Analyzeru}}.
+		.1 thesis\DTcomment{text práce}.
+		.2 src.
+		.3 BP\_Lejnar\_Jan\_2017.tex\DTcomment{text práce ve formátu \LaTeX{}}.
+		.2 text.
+		.3 BP\_Lejnar\_Jan\_2017.pdf\DTcomment{text práce ve formátu PDF}.
+		.1 Makefile\DTcomment{makefile \textit{Forensic Analyzeru}}.
+		.1 readme.pdf\DTcomment{stručný popis nejdůležitějšího obsahu CD}.
+	}
+\end{figure}
+
+\end{document}

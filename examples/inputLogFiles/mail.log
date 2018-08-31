@@ -1,0 +1,35 @@
+Oct 30 06:30:16 locust postfix/smtpd[23000]: connect from unknown[198.6.19.15]
+Oct 30 06:30:16 locust postfix/smtpd[23000]: lost connection after AUTH from unknown[198.6.19.15]
+Oct 30 06:30:16 locust postfix/smtpd[23000]: disconnect from unknown[198.6.19.15]
+Nov  3 07:40:01 locust postfix/submission/smtpd[20934]: connect from localhost[127.0.0.1]
+Nov  3 07:40:01 locust postfix/submission/smtpd[20934]: D60C21B9803D: client=localhost[127.0.0.1], sasl_method=LOGIN, sasl_username=praha1
+Nov  3 07:40:01 locust postfix/cleanup[20936]: D60C21B9803D: message-id=<20161103064001.D60C21B9803D@locust.amagical.net>
+Nov  3 07:40:01 locust postfix/qmgr[31539]: D60C21B9803D: from=<soukenicka@cb.cz>, size=5353, nrcpt=1 (queue active)
+Nov  3 07:40:01 locust postfix/submission/smtpd[20934]: disconnect from localhost[127.0.0.1]
+Nov  3 07:40:04 locust postfix/smtpd[20948]: connect from localhost[127.0.0.1]
+Nov  3 07:40:04 locust postfix/smtpd[20948]: 2DBB91B9804B: client=localhost[127.0.0.1]
+Nov  3 07:40:04 locust postfix/cleanup[20936]: 2DBB91B9804B: message-id=<20161103064001.D60C21B9803D@locust.amagical.net>
+Nov  3 07:40:04 locust postfix/smtpd[20948]: disconnect from localhost[127.0.0.1]
+Nov  3 07:40:04 locust postfix/qmgr[31539]: 2DBB91B9804B: from=<soukenicka@cb.cz>, size=5957, nrcpt=1 (queue active)
+Nov  3 07:40:04 locust amavis[14295]: (14295-11) Passed BAD-HEADER-2 {RelayedOutbound,Quarantined}, LOCAL [127.0.0.1]:39257 [127.0.0.1] <soukenicka@cb.cz> -> <nikiforova@seznam.cz>, quarantine: l/badh-l38BYElb1U4s, Queue-ID: D60C21B9803D, Message-ID: <20161103064001.D60C21B9803D@locust.amagical.net>, mail_id: l38BYElb1U4s, Hits: 1.311, size: 5351, queued_as: 2DBB91B9804B, 2248 ms                                         
+Nov  3 07:40:04 locust postfix/smtp[20937]: D60C21B9803D: to=<nikiforova@seznam.cz>, relay=127.0.0.1[127.0.0.1]:10024, delay=2.4, delays=0.1/0.01/0/2.2, dsn=2.0.0, status=sent (250 2.0.0 from MTA(smtp:[127.0.0.1]:10025): 250 2.0.0 Ok: queued as 2DBB91B9804B)                        
+Nov  3 07:40:04 locust postfix/qmgr[31539]: D60C21B9803D: removed
+Nov  3 07:40:04 locust postfix/smtp[20949]: connect to mx1.seznam.cz[2a02:598:2::42]:25: Network is unreachable
+Nov  3 07:40:04 locust postfix/smtpd[20948]: connect from localhost[127.0.0.1]
+Nov  3 07:40:04 locust postfix/smtpd[20948]: 623141B9803D: client=localhost[127.0.0.1]
+Nov  3 07:40:04 locust postfix/cleanup[20936]: 623141B9803D: message-id=<20161103064002.03F991B98040@locust.amagical.net>
+Nov  3 07:40:04 locust postfix/smtpd[20948]: disconnect from localhost[127.0.0.1]
+Nov  3 07:40:04 locust postfix/qmgr[31539]: 623141B9803D: from=<soukenicka@cb.cz>, size=9669, nrcpt=1 (queue active)
+Nov  3 07:40:04 locust amavis[14435]: (14435-09) Passed BAD-HEADER-2 {RelayedOutbound,Quarantined}, LOCAL [127.0.0.1]:39260 [127.0.0.1] <soukenicka@cb.cz> -> <p.sovova@seznam.cz>, quarantine: 2/badh-2dlxwFrBML-r, Queue-ID: 03F991B98040, Message-ID: <20161103064002.03F991B98040@locust.amagical.net>, mail_id: 2dlxwFrBML-r, Hits: 1.311, size: 9060, queued_as: 623141B9803D, 2344 ms
+Nov  3 07:40:04 locust postfix/smtp[20940]: 03F991B98040: to=<p.sovova@seznam.cz>, relay=127.0.0.1[127.0.0.1]:10024, delay=2.4, delays=0.06/0.01/0/2.3, dsn=2.0.0, status=sent (250 2.0.0 from MTA(smtp:[127.0.0.1]:10025): 250 2.0.0 Ok: queued as 623141B9803D)
+Nov  3 07:40:04 locust postfix/qmgr[31539]: 03F991B98040: removed
+Nov  3 07:40:05 locust postfix/smtp[20954]: 623141B9803D: to=<p.sovova@seznam.cz>, relay=mx1.seznam.cz[77.75.78.42]:25, delay=1.1, delays=0.01/0.01/1/0.02, dsn=2.0.0, status=sent (250 2.0.0 Mail 674707095 queued for delivery in session 7897000002eb.)
+Nov  3 07:40:05 locust postfix/qmgr[31539]: 623141B9803D: removed
+Nov  3 08:09:45 locust postfix/smtpd[23135]: connect from 118-161-243-251.dynamic.hinet.net[118.161.243.251]
+Nov  3 08:09:46 locust postfix/smtpd[23135]: NOQUEUE: reject: RCPT from 118-161-243-251.dynamic.hinet.net[118.161.243.251]: 554 5.7.1 <uakh.fpxe@msa.hinet.net>: Relay access denied; from=<z2007tw@yahoo.com.tw> to=<uakh.fpxe@msa.hinet.net> proto=SMTP helo=<83.167.225.240>
+Nov  3 08:09:46 locust postfix/smtpd[23135]: lost connection after RCPT from 118-161-243-251.dynamic.hinet.net[118.161.243.251]
+Nov  3 08:09:46 locust postfix/smtpd[23135]: disconnect from 118-161-243-251.dynamic.hinet.net[118.161.243.251]4.4.1, status=deferred (connect to baghdad.core.ignum.cz[217.31.49.20]:25: Connection timed out)                                             
+Nov  3 09:25:02 locust postfix/smtpd[29691]: connect from pandora.altura.ru[95.141.192.27]
+Nov  3 09:25:02 locust postfix/smtpd[29691]: NOQUEUE: reject: RCPT from pandora.altura.ru[95.141.192.27]: 554 5.7.1 <joe1991@cestabliz.cz>: Relay access denied; from=<> to=<joe1991@cestabliz.cz> proto=ESMTP helo=<pandora.altura.ru>                                                   
+Nov  3 09:25:04 locust postfix/smtpd[29691]: disconnect from pandora.altura.ru[95.141.192.27]
+

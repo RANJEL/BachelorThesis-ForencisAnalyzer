@@ -1,0 +1,4 @@
+[Sun Oct 30 06:12:48 2016] [error] [client 185.25.148.240] File does not exist: /var/www/testproxy.php
+[Sun Oct 30 06:26:24 2016] [error] [client 91.236.75.4] File does not exist: /var/www/reader
+[Sun Oct 30 07:11:57 2016] [error] [client 127.0.0.1] Directory index forbidden by Options directive: /srv/www/wp-content/uploads
+

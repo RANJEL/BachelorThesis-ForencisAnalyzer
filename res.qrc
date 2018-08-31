@@ -1,0 +1,18 @@
+<RCC>
+    <qresource prefix="/resources">
+        <file>res/icons/ConfigFileDelete.png</file>
+        <file>res/icons/ConfigFileModify.png</file>
+        <file>res/icons/ConfigFileNew.png</file>
+        <file>res/icons/Help.png</file>
+        <file>res/icons/LogFileAdd.png</file>
+        <file>res/icons/LogFileDelete.png</file>
+        <file>res/icons/LogFileModify.png</file>
+        <file>res/icons/Save.png</file>
+        <file>res/icons/SaveAll.png</file>
+        <file>res/icons/StartAnalysis.png</file>
+        <file>res/icons/TimeFilter.png</file>
+        <file>res/icons/GenerateRule.png</file>
+        <file>res/icons/DebugLevel.png</file>
+        <file>res/icons/ClearFilters.png</file>
+    </qresource>
+</RCC>

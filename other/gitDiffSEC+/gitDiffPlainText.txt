@@ -1,0 +1,933 @@
+diff --git a/sec b/sec
+index 70dc1b7..9a5bc2b 100644
+--- a/sec
++++ b/sec
+@@ -1,7 +1,7 @@
+ #!/usr/bin/perl -w
+ #
+-# SEC (Simple Event Correlator) 2.7.11 - sec
+-# Copyright (C) 2000-2017 Risto Vaarandi
++# SEC+ (Simple Event Correlator+) 2.7.11.1 - sec+
++# Copyright (C) 2000-2017 Risto Vaarandi + Jan Lejnar
+ #
+ # This program is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU General Public License
+@@ -152,6 +152,12 @@ use vars qw(
+         %variables
+         $version
+         $WIN32
++        $parseEventTime
++        $parsedTimeOrder
++        $dontParseEventTime
++        %fileFormatName2Regex
++        $timeFilterFrom
++        $timeFilterTo
+     );
+ 
+ 
+@@ -163,6 +169,7 @@ use Getopt::Long;
+ use Fcntl;
+ use Socket;
+ use IO::Handle;
++use Date::Parse; # str2time()
+ 
+ # check if Sys::Syslog is available
+ 
+@@ -174,8 +181,8 @@ $WIN32 = ($^O =~ /win/i && $^O !~ /cygwin/i && $^O !~ /darwin/i);
+ 
+ # set version and usage variables
+ 
+-$SEC_VERSION = "SEC (Simple Event Correlator) 2.7.11";
+-$SEC_COPYRIGHT = "Copyright (C) 2000-2017 Risto Vaarandi";
++$SEC_VERSION = "SEC+ (Simple Event Correlator+) 2.7.11.1";
++$SEC_COPYRIGHT = "Copyright (C) 2000-2017 Risto Vaarandi + Jan Lejnar";
+ 
+ $SEC_USAGE = qq!Usage: $0 [options]
+ 
+@@ -214,6 +221,11 @@ Options:
+   --testonly, --notestonly
+   --help, -?
+   --version
++  --parseEventTime
++  --parsedTimeOrder
++  --dontParseEventTime
++  --timeFilterFrom=<month>/<day>[/<year>]:<hour>:<minute>:<second>
++  --timeFilterTo=<month>/<day>[/<year>]:<hour>:<minute>:<second>
+ !;
+ 
+ $SEC_LICENSE = q!
+@@ -364,6 +376,7 @@ use constant DEFAULT_SOCKETTIMEOUT => 60;
+ use constant DEFAULT_BLOCKSIZE => 8192;
+ use constant DEFAULT_CLEANTIME => 1;
+ use constant DEFAULT_DUMPFILE => "/tmp/sec.dump";
++use constant DEFAULT_LOGFORMATSFILE => "./res/logFormats.conf";
+ 
+ 
+ ###############################################################
+@@ -433,20 +446,25 @@ sub open_syslog {
+ #         connected to terminal, message will also be written there.
+ 
+ sub log_msg {
+-
+     my ($level) = shift(@_);
++
+     my ($ltime, $msg);
+ 
+     if ($debuglevel < $level) { return; }
+ 
+-    if (!$logopen && !$syslogopen && !-t STDERR) { return; }
+-
+     $msg = join(" ", @_);
++    $ltime = localtime(time()); # OK time() for logging
+ 
+-    if (-t STDERR) { print STDERR "$msg\n"; }
++    ################
++    # + Jan Lejnar #
++    ################
++    # For debugging allways print log message to STDERR - not only when the filehandle opened by a TTY (terminal)
++    print STDERR "$ltime: $msg\n";
++
++    if (!$logopen && !$syslogopen) { return; }
++    ################
+ 
+     if ($logopen) {
+-        $ltime = localtime(time());
+         print LOGFILE "$ltime: $msg\n";
+     }
+ 
+@@ -3589,7 +3607,7 @@ sub read_config {
+ 
+     # Set the $lastconfigload variable to reflect the current time
+ 
+-    $lastconfigload = time();
++    $lastconfigload = time(); # OK
+ 
+     # Initialize global arrays %configuration, %config_ltimes, %config_mtimes,
+     # %config_options, @calendar, @conffiles, %cfset2cfile, @maincfiles.
+@@ -3691,7 +3709,7 @@ sub soft_read_config {
+ 
+     # Set the $lastconfigload variable to reflect the current time
+ 
+-    $lastconfigload = time();
++    $lastconfigload = time(); # OK
+ 
+     # Initialize global arrays %configuration, %config_ltimes, %config_mtimes,
+     # %config_options, @calendar, @conffiles, %cfset2cfile, @maincfiles.
+@@ -3868,7 +3886,7 @@ sub substitute_actionlist_var {
+ 
+     if (index($_[0], "%") == - 1) { return; }
+ 
+-    my ($time) = time();
++    my ($time) = time(); # ?
+ 
+     # if builtin time-based action list variables do not reflect the current
+     # second, set these variables to proper values
+@@ -4715,6 +4733,7 @@ sub execute_tcpsock_action {
+ 
+         if (!defined($ret) || $ret <= 0) {
+             if (time() - $output_tcpconn{$peer}->{"time"} > $socket_timeout) {
++                # OK socket
+                 log_msg(LOG_DEBUG,
+                     "Can't connect to TCP peer '$peer' (connection establishment timeout)");
+                 delete $output_tcpconn{$peer};
+@@ -4781,7 +4800,7 @@ sub execute_tcpsock_action {
+         if ($! == EINPROGRESS) {
+             $output_tcpconn{$peer} = { "socket" => $handle,
+                 "buffer"                        => [ $event ],
+-                "time"                          => time() };
++                "time"                          => time() }; # OK socket
+         } else {
+             log_msg(LOG_DEBUG,
+                 "Can't connect to TCP peer '$peer' for sending event '$event' ($!)");
+@@ -4955,7 +4974,7 @@ sub execute_create_action {
+ 
+             if (!exists($context_list{$context}->{"Internal"})) {
+ 
+-                $context_list{$context}->{"Time"} = time();
++                $context_list{$context}->{"Time"} = getTimeAccordingToSecParams(); # updating context
+                 $context_list{$context}->{"Window"} = $lifetime;
+                 $context_list{$context}->{"Action"} = $list;
+                 $context_list{$context}->{"Desc"} = $text;
+@@ -4968,13 +4987,12 @@ sub execute_create_action {
+ 
+         } else {
+ 
+-            $context_list{$context} = { "Time" => time(),
++            $context_list{$context} = { "Time" => getTimeAccordingToSecParams(),
+                 "Window"                       => $lifetime,
+                 "Buffer"                       => [ ],
+                 "Action"                       => $list,
+                 "Desc"                         => $text,
+-                "Aliases"                      => { $context => 1 } };
+-
++                "Aliases"                      => { $context => 1 } }; # creating context
+         }
+ 
+     } else {
+@@ -5070,7 +5088,7 @@ sub execute_set_action {
+             if (!exists($context_list{$context}->{"Internal"})) {
+ 
+                 if (defined($lifetime)) {
+-                    $context_list{$context}->{"Time"} = time();
++                    $context_list{$context}->{"Time"} = getTimeAccordingToSecParams(); # context change
+                     $context_list{$context}->{"Window"} = $lifetime;
+                 }
+ 
+@@ -5177,12 +5195,12 @@ sub execute_add_action {
+ 
+     if (!exists($context_list{$context})) {
+ 
+-        $context_list{$context} = { "Time" => time(),
++        $context_list{$context} = { "Time" => ($intevents && $event =~ /SEC_\S+/) ? time() : getTimeAccordingToSecParams(),
+             "Window"                       => 0,
+             "Buffer"                       => [ ],
+             "Action"                       => [ ],
+             "Desc"                         => "",
+-            "Aliases"                      => { $context => 1 } };
++            "Aliases"                      => { $context => 1 } }; # context adding event
+     }
+ 
+     if (!exists($context_list{$context}->{"Internal"})) {
+@@ -5220,12 +5238,12 @@ sub execute_prepend_action {
+ 
+     if (!exists($context_list{$context})) {
+ 
+-        $context_list{$context} = { "Time" => time(),
++        $context_list{$context} = { "Time" => getTimeAccordingToSecParams(),
+             "Window"                       => 0,
+             "Buffer"                       => [ ],
+             "Action"                       => [ ],
+             "Desc"                         => "",
+-            "Aliases"                      => { $context => 1 } };
++            "Aliases"                      => { $context => 1 } }; # prepending event to context
+     }
+ 
+     if (!exists($context_list{$context}->{"Internal"})) {
+@@ -5263,12 +5281,12 @@ sub execute_fill_action {
+ 
+     if (!exists($context_list{$context})) {
+ 
+-        $context_list{$context} = { "Time" => time(),
++        $context_list{$context} = { "Time" => getTimeAccordingToSecParams(),
+             "Window"                       => 0,
+             "Buffer"                       => [ ],
+             "Action"                       => [ ],
+             "Desc"                         => "",
+-            "Aliases"                      => { $context => 1 } };
++            "Aliases"                      => { $context => 1 } }; # filling context
+     }
+ 
+     if (!exists($context_list{$context}->{"Internal"})) {
+@@ -5575,7 +5593,7 @@ sub execute_setctime_action {
+             if (!exists($context_list{$context}->{"Internal"})) {
+ 
+                 $time = $context_list{$context}->{"Time"};
+-                $time2 = time();
++                $time2 = getTimeAccordingToSecParams();
+ 
+                 if ($timestamp < $time) {
+                     log_msg(LOG_WARN,
+@@ -5623,7 +5641,7 @@ sub execute_event_action {
+         foreach $event (@event) {
+             log_msg(LOG_DEBUG, "Scheduling the creation of event '$event' after $createafter seconds");
+             push @pending_events, [ time() + $createafter, $event,
+-                    SYNEVENT_INT_CONTEXT ];
++                    SYNEVENT_INT_CONTEXT ]; # OK action event
+         }
+     } else {
+         foreach $event (@event) {
+@@ -5656,7 +5674,7 @@ sub execute_tevent_action {
+             foreach $event (@event) {
+                 log_msg(LOG_DEBUG, "Scheduling the creation of event '$event' after $createafter seconds");
+                 push @pending_events, [ time() + $createafter, $event,
+-                        SYNEVENT_INT_CONTEXT ];
++                        SYNEVENT_INT_CONTEXT ]; # OK
+             }
+         } else {
+             foreach $event (@event) {
+@@ -5696,7 +5714,7 @@ sub execute_cevent_action {
+             foreach $event (@event) {
+                 log_msg(LOG_DEBUG,
+                     "Scheduling the creation of event '$event' with context '$context' after $createafter seconds");
+-                push @pending_events, [ time() + $createafter, $event, $context ];
++                push @pending_events, [ time() + $createafter, $event, $context ];  # OK
+             }
+         } else {
+             foreach $event (@event) {
+@@ -5816,7 +5834,7 @@ sub execute_setwpos_action {
+ 
+             $oper = $corr_list{$key};
+             $time = $oper->{"Time"};
+-            $time2 = time();
++            $time2 = time(); # OK setwpos action
+ 
+             if ($timestamp < $time) {
+                 log_msg(LOG_WARN,
+@@ -6218,8 +6236,8 @@ sub valid_context {
+ 
+         if (!$context_list{$context}->{"Window"}) { return 1; }
+ 
+-        if (time() - $context_list{$context}->{"Time"}
+-            <= $context_list{$context}->{"Window"}) { return 1; }
++        if (getTimeAccordingToSecParams() - $context_list{$context}->{"Time"}
++            <= $context_list{$context}->{"Window"}) { return 1; } # validate context
+ 
+         # if the valid_context was called recursively and action-list-on-expire
+         # is currently executing, the context is considered stale and return 0
+@@ -7521,7 +7539,7 @@ sub process_singlewithsuppress_rule {
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }
+ 
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);
+-    $time = time();
++    $time = getTimeAccordingToSecParams();
+ 
+     # if there is no event correlation operation for the key, or
+     # the operation with the key has expired, start the new operation
+@@ -7565,7 +7583,7 @@ sub process_pair_rule {
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }
+ 
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);
+-    $time = time();
++    $time = getTimeAccordingToSecParams();
+ 
+     # if there is no event correlation operation for the key, or
+     # the operation with the key has expired, start the new operation
+@@ -7718,7 +7736,7 @@ sub process_pairwithwindow_rule {
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }
+ 
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);
+-    $time = time();
++    $time = getTimeAccordingToSecParams();
+ 
+     # if there is an event correlation operation for the key and
+     # the operation has expired, execute the first action list and
+@@ -7863,6 +7881,119 @@ sub process_pairwithwindow_rule {
+ 
+ }
+ 
++################
++# + Jan Lejnar #
++################
++# Action: get time according to sec params, that were defined on startup.
++# SEC used to use only time() option. It wasn't designed for offline analysis.
++# The biggest improvement that SEC+ provide is that it allows you to parse event time
++# directly from log files, furthermore read in the order of this parsed time.
++sub getTimeAccordingToSecParams {
++    if ($parseEventTime) {
++        if ($parsedTimeOrder) {
++            return $inputsrc{$input_sources[$bufpos]}->{"recentTime"};
++        } else {
++            return getEventTimeFromProcessingLine($input_buffer[$bufpos], $input_sources[$bufpos]);
++        }
++    } else {
++        return time();
++    }
++}
++
++################
++# + Jan Lejnar #
++################
++# Parameters: par1 - reference to the fileFormatName
++# Action: try to find regex that describes, how to parse date of input file of type fileFormatName
++sub searchForRegexInLogFormatsFile {
++    my $fileFormatName = $_[0];
++    my $fileFormatRegex;
++    my $logFormatsFile = DEFAULT_LOGFORMATSFILE;
++
++    if (!open(DATA, "<", $logFormatsFile)) {
++        log_msg(LOG_DEBUG, "Couldn't open file with logFormats: $logFormatsFile");
++        die "Couldn't open file with logFormats: $logFormatsFile";
++    }
++
++    my $actFileFormatName;
++    while(<DATA>) {
++        #      print "$_";
++
++        if ($_ =~ /^(\S+)=(.*)$/) {
++            $actFileFormatName = $1;
++
++            if ($actFileFormatName eq $fileFormatName) {
++                $fileFormatRegex = $2;
++                eraseNewLines($fileFormatRegex); # fix if logFormats file has windows endings
++                last;
++            }
++        }
++    }
++
++    if (not defined $fileFormatRegex) {
++        log_msg(LOG_DEBUG,
++            "File with logFormats ($logFormatsFile) does not contain entry for this fileFormat ($fileFormatName)");
++        die "File with logFormats ($logFormatsFile) does not contain entry for this fileFormat ($fileFormatName)"
++    }
++
++    $fileFormatName2Regex{$fileFormatName} = $fileFormatRegex;
++    return $fileFormatRegex;
++}
++
++################
++# + Jan Lejnar #
++################
++# Action: returns parsed event time from actually processing line
++sub getEventTimeFromProcessingLine {
++    my ($line, $file, $fileFormatName);
++    $line = $_[0];
++    $file = $_[1];
++
++    if ($file eq "-") {
++        log_msg(LOG_DEBUG, "Can't read from standart input when --parseEventTime is set");
++        die "Can't read from standart input when --parseEventTime is set";
++    }
++
++    $fileFormatName = $inputsrc{$file}->{"context"};
++
++    if (substr($fileFormatName, 0, length(FILEVENT_INT_CONTEXT_PREF)) eq FILEVENT_INT_CONTEXT_PREF) {
++        log_msg(LOG_DEBUG,
++            "You have to specify fileFormatName for --input=$file -> append =<FILEFORMATNAME> when --parseEventTime is set");
++        die "You have to specify fileFormatName for --input=$file -> append =<FILEFORMATNAME> when --parseEventTime is set";
++    }
++
++    my $fileFormatRegex = $fileFormatName2Regex{$fileFormatName};
++
++    if (not defined $fileFormatRegex) {
++        log_msg(LOG_DEBUG,
++            "I have to search for $fileFormatName in logFormats file");
++        $fileFormatRegex = searchForRegexInLogFormatsFile($fileFormatName);
++    }
++
++    if ($line !~ /$fileFormatRegex/) {
++        log_msg(LOG_DEBUG, "Can't match fileFormatRegex to line ($line)");
++        die "Can't match fileFormatRegex to line ($line)";
++    }
++
++    my $year = $+{year} || ""; # optional => then I assume that the date is the first matching date before current time
++
++    if (!defined($+{month}) || !defined($+{day}) || !defined($+{hour}) || !defined($+{minute}) || !defined($+{second})) {
++        log_msg(LOG_DEBUG,
++            "Some mandatory field of date parsing regex were not specifed for log file: ($file)");
++        die "Some mandatory field of date parsing regex were not specifed for log file: ($file)";
++    }
++    
++    my $commonLogFormatStr = "$+{month}/$+{day}/$year:$+{hour}:$+{minute}:$+{second}";
++
++    my $epoch = str2time($commonLogFormatStr);
++    if (defined $epoch) {
++        return $epoch;
++    } else {
++        log_msg(LOG_DEBUG,
++            "Can't get eventTime from date ($commonLogFormatStr)");
++        die "Can't get eventTime from date ($commonLogFormatStr)"
++    }
++}
+ 
+ # Parameters: par1 - reference to the rule definition
+ #             par2 - reference to the hash of match values
+@@ -7878,7 +8009,7 @@ sub process_singlewiththreshold_rule {
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }
+ 
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);
+-    $time = time();
++    $time = getTimeAccordingToSecParams();
+ 
+     # if there exists event correlation operation for the key and its window
+     # has expired, slide the window forward or terminate the operation
+@@ -7976,7 +8107,7 @@ sub process_singlewith2thresholds_rule {
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }
+ 
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);
+-    $time = time();
++    $time = getTimeAccordingToSecParams();
+ 
+     # if there exists event correlation operation for the key and its window
+     # has expired, slide the window forward or terminate the operation
+@@ -8104,7 +8235,7 @@ sub process_eventgroup_rule {
+     if (scalar(%{$subst})) { subst_string($subst, $desc, '$'); }
+ 
+     $key = gen_key($conffile, $rule->{"ID"}, $desc);
+-    $time = time();
++    $time = getTimeAccordingToSecParams();
+ 
+     # if there exists event correlation operation for the key and its window
+     # has expired, slide the window forward or terminate the operation
+@@ -8349,8 +8480,7 @@ sub match_pair_operations {
+             if ($rule->{"Type"} == PAIR) {
+ 
+                 if (!$oper->{"Window"} ||
+-                    time() - $oper->{"Time"} <= $oper->{"Window"}) {
+-
++                    getTimeAccordingToSecParams() - $oper->{"Time"} <= $oper->{"Window"}) {
+                     $ret = 1;
+                     ++$rule->{"MatchCount"};
+ 
+@@ -8703,7 +8833,7 @@ sub process_lists {
+     if (scalar(@pending_events)) {
+ 
+         @buffer = ();
+-        $time = time();
++        $time = time(); # OK ? removing obsolete elems
+ 
+         foreach $pevt (@pending_events) {
+             if ($time >= $pevt->[0]) {
+@@ -8728,7 +8858,7 @@ sub process_lists {
+ 
+     # process CALENDAR rules
+ 
+-    @time = localtime(time());
++    @time = localtime(time()); # OK calendar rule
+     $minute = $time[1];
+     $hour = $time[2];
+     $day = $time[3];
+@@ -8736,7 +8866,7 @@ sub process_lists {
+     $year = $time[5];
+     $weekday = $time[6];
+ 
+-    $lastdayofmonth = ((localtime(time() + 86400))[3] == 1);
++    $lastdayofmonth = ((localtime(time() + 86400))[3] == 1); # OK
+     $shortyear = $year % 100;
+ 
+     foreach $rule (@calendar) {
+@@ -8792,7 +8922,7 @@ sub process_lists {
+         if (!exists($corr_list{$key})) { next; }
+ 
+         $oper = $corr_list{$key};
+-        $time = time();
++        $time = getTimeAccordingToSecParams();
+ 
+         # if the correlation window has not expired, move to next operation
+         if ($time - $oper->{"Time"} <= $oper->{"Window"}) { next; }
+@@ -9745,7 +9875,7 @@ sub dump_data {
+ 
+     # get the current time
+ 
+-    $time = time();
++    $time = time(); # OK debug dump
+ 
+     # with --dumpfts command line option, include seconds since epoch
+     # in the dump file name as a suffix
+@@ -10302,11 +10432,25 @@ sub consume_pipe {
+ 
+         } elsif ($ret == 0) { last; }
+ 
+-        # try to read from the pipe
++        ################
++        # + Jan Lejnar #
++        ################
++        if ($parseEventTime && $parsedTimeOrder) {
++            $children{$pid}->{"buffer"} = readline $children{$pid}->{"fh"};
++            if (!defined($children{$pid}->{"buffer"})) {
++                $nbytes = 0;
++            } else {
++                eraseNewLines($children{$pid}->{"buffer"});
++                $nbytes = length($children{$pid}->{"buffer"});
++            }
++        } else {
++            # try to read from the pipe
+ 
+-        $nbytes = sysread($children{$pid}->{"fh"},
+-            $children{$pid}->{"buffer"},
+-            $blocksize, length($children{$pid}->{"buffer"}));
++            $nbytes = sysread($children{$pid}->{"fh"},
++                $children{$pid}->{"buffer"},
++                $blocksize, length($children{$pid}->{"buffer"}));
++        }
++        ################
+ 
+         # if sysread() failed and the reason was other than a caught signal,
+         # close the pipe and quit the read-loop;
+@@ -10473,7 +10617,7 @@ sub check_tcp_conn {
+ 
+     my ($time, $peer, $win, $ret, $event, $nbytes, $sockok);
+ 
+-    $time = time();
++    $time = time(); # OK TCP-connection
+ 
+     # communication errors with remote peers are logged at the debug level,
+     # in order to prevent message floods with higher severity when large
+@@ -10770,7 +10914,7 @@ sub open_input {
+     # Open the input files
+ 
+     @inputfiles = sort keys %fcont;
+-    $time = time();
++    $time = time(); # OK opening input files
+ 
+     foreach $inputfile (@inputfiles) {
+ 
+@@ -10908,6 +11052,14 @@ sub input_shuffled {
+ 
+ }
+ 
++#################
++# + Jan Lejnar  #
++#################
++# Parameters: par - string which should be modified
++# Action: erases all \r or \n characters from string
++sub eraseNewLines {
++    $_[0] =~ s/\r|\n//g;
++}
+ 
+ # Parameters: par1 - name of the input file
+ # Action: read next line from the input file and return it (without '\n' at
+@@ -10932,12 +11084,25 @@ sub read_line_from_file {
+     }
+ 
+     if ($inputsrc{$file}->{"regfile"}) {
++        ################
++        # + Jan Lejnar #
++        ################
++        if ($parseEventTime && $parsedTimeOrder) {
++            $inputsrc{$file}->{"buffer"} = readline $inputsrc{$file}->{"fh"};
++            if (!defined($inputsrc{$file}->{"buffer"})) {
++                $nbytes = 0;
++            } else {
++                eraseNewLines($inputsrc{$file}->{"buffer"});
++                $nbytes = length($inputsrc{$file}->{"buffer"});
++            }
++        } else {
++            # try to read data from a regular file
+ 
+-        # try to read data from a regular file
+-
+-        $nbytes = sysread($inputsrc{$file}->{"fh"},
+-            $inputsrc{$file}->{"buffer"},
+-            $blocksize, length($inputsrc{$file}->{"buffer"}));
++            $nbytes = sysread($inputsrc{$file}->{"fh"},
++                $inputsrc{$file}->{"buffer"},
++                $blocksize, length($inputsrc{$file}->{"buffer"}));
++        }
++        ################
+ 
+         # check the exit value from sysread() that was saved to $nbytes:
+         # if $nbytes == undef, sysread() failed;
+@@ -11006,12 +11171,25 @@ sub read_line_from_file {
+             return undef;
+ 
+         } elsif ($ret == 0) { return undef; }
++        ################
++        # + Jan Lejnar #
++        ################
++        if ($parseEventTime && $parsedTimeOrder) {
++            $inputsrc{$file}->{"buffer"} = readline $inputsrc{$file}->{"fh"};
++            if (!defined($inputsrc{$file}->{"buffer"})) {
++                $nbytes = 0;
++            } else {
++                eraseNewLines($inputsrc{$file}->{"buffer"});
++                $nbytes = length($inputsrc{$file}->{"buffer"});
++            }
++        } else {
++            # try to read from the pipe
+ 
+-        # try to read from the pipe
+-
+-        $nbytes = sysread($inputsrc{$file}->{"fh"},
+-            $inputsrc{$file}->{"buffer"},
+-            $blocksize, length($inputsrc{$file}->{"buffer"}));
++            $nbytes = sysread($inputsrc{$file}->{"fh"},
++                $inputsrc{$file}->{"buffer"},
++                $blocksize, length($inputsrc{$file}->{"buffer"}));
++        }
++        ################
+ 
+         # check the exit value from sysread() that was saved to $nbytes:
+         # if $nbytes == undef, sysread() failed;
+@@ -11064,7 +11242,7 @@ sub read_line_from_file {
+                     $inputsrc{$file}->{"regfile"}) = open_input_file($file, - 1);
+ 
+                 $inputsrc{$file}->{"open"} = defined($inputsrc{$file}->{"fh"});
+-                if ($reopen_timeout) { $inputsrc{$file}->{"lastopen"} = time(); }
++                if ($reopen_timeout) { $inputsrc{$file}->{"lastopen"} = time(); } # OK reopening the pipe
+ 
+             }
+ 
+@@ -11077,22 +11255,136 @@ sub read_line_from_file {
+ 
+     }
+ 
+-    # if the read buffer contains a newline, cut the first line from the
+-    # read buffer and return it, otherwise return undef (even if there are
+-    # some bytes in the buffer)
++    ################
++    # + Jan Lejnar #
++    ################
++    if ($parseEventTime && $parsedTimeOrder) {
++        $line = $inputsrc{$file}->{"buffer"};
++        return $line;
++    } else {
++        # if the read buffer contains a newline, cut the first line from the
++        # read buffer and return it, otherwise return undef (even if there are
++        # some bytes in the buffer)
+ 
+-    $pos = index($inputsrc{$file}->{"buffer"}, "\n");
++        $pos = index($inputsrc{$file}->{"buffer"}, "\n");
+ 
+-    if ($pos != - 1) {
+-        $line = substr($inputsrc{$file}->{"buffer"}, 0, $pos);
+-        substr($inputsrc{$file}->{"buffer"}, 0, $pos + 1) = "";
+-        return $line;
++        if ($pos != - 1) {
++            $line = substr($inputsrc{$file}->{"buffer"}, 0, $pos);
++            substr($inputsrc{$file}->{"buffer"}, 0, $pos + 1) = "";
++            return $line;
++        }
++
++        return undef;
++    }
++}
++
++################
++# + Jan Lejnar #
++################
++# Parameters: par1 - event time to check
++# Action: if one of timeFilters is active, or both, check if event time is in range
++sub checkEventTimeBounds {
++    my $eventTime = $_[0];
++
++    if (defined($timeFilterFrom)) {
++        if ($eventTime < $timeFilterFrom) {
++            return 0; # false
++        }
+     }
+ 
+-    return undef;
++    if (defined($timeFilterTo)) {
++        if ($eventTime > $timeFilterTo) {
++            return 0; # false
++        }
++    }
+ 
++    return 1; # true
+ }
+ 
++################
++# + Jan Lejnar #
++################
++# Action: fills @readbuffer[0] with line, that came the most recently of all front lines of input files
++# @readbuffer[1] will contain the file name, where line is
++# @readbuffer[2] will contain the parsed event time, in order to provide more efficiency
++# this modified version of read_line() won't save any more events into @readbuffer and will read lines from input files, not fixed ammount of blocksize
++sub readRecentLineToReadbuffer {
++    my ($line, $file, $time, $eventTime);
++    my ($mostRecentTime, $fileWithMostRecentTime);
++
++    # check all input files and store new data to the read buffer
++    #$newdata = 0;
++    $time = time();
++    my $eventTimeInBounds;
++
++    foreach $file (@inputfiles) {
++        if ($inputsrc{$file}->{"open"}) {
++
++            $eventTimeInBounds = 0;
++            if (($inputsrc{$file}->{"buffer"}) eq "") {
++
++                while ($inputsrc{$file}->{"open"} && !$eventTimeInBounds) {
++                    $line = read_line_from_file($file);
++                    if (defined($line)) {
++                        $eventTime = getEventTimeFromProcessingLine($line, $file);
++                        $inputsrc{$file}->{"recentTime"} = $eventTime;
++                        $eventTimeInBounds = checkEventTimeBounds($eventTime);
++                    }
++                }
++                if (!defined($line)) {
++                    next;
++                }
++
++            } else {
++                $eventTime = $inputsrc{$file}->{"recentTime"};
++            }
++
++            if (!defined($mostRecentTime)) {
++                $mostRecentTime = $eventTime;
++                $fileWithMostRecentTime = $file;
++            } elsif ($eventTime < $mostRecentTime) {
++                $mostRecentTime = $eventTime;
++                $fileWithMostRecentTime = $file;
++            }
++        } else { # this file is closed - all lines was read
++            $inputsrc{$file}->{"buffer"} = undef;
++        }
++    }
++
++    if (!defined($fileWithMostRecentTime)) {
++        $line = undef;
++    } else {
++        $file = $fileWithMostRecentTime;
++        $line = $inputsrc{$file}->{"buffer"};
++        $inputsrc{$file}->{"buffer"} = "";
++    }
++
++    if (defined($line)) {
++        # if we received a new line, write the line to the read buffer; also
++        # update time-related variables and call external script, if necessary
++
++        push @readbuffer, $line, $file;
++
++        if ($input_timeout) {
++            $inputsrc{$file}->{"lastread"} = $time;
++        }
++
++        if ($inputsrc{$file}->{"scriptexec"}) {
++            log_msg(LOG_INFO,
++                "Input received, executing script $timeout_script 0 $file");
++
++            shell_cmd("$timeout_script 0 $file");
++            $inputsrc{$file}->{"scriptexec"} = 0;
++        }
++    } else {
++        push @readbuffer, undef, undef; # every lines from every files was read
++    }
++
++    # force rest of code to work properly: to ignore info from this method and proceede to get $line and $file from @readbuffer
++    $_[0] = undef;
++    $_[1] = "undef"; # to don't jump into condition if (!$file) later..
++}
++################
+ 
+ # Parameters: par1 - variable where the input line is saved
+ #             par2 - variable where the input file name is saved
+@@ -11356,7 +11648,7 @@ sub check_signals {
+         # since all action list variables have been dropped, re-create builtin
+         # action list variables for the current second and special characters
+ 
+-        $timevar_update = time();
++        $timevar_update = time(); # OK ?
+         set_actionlist_time_var($timevar_update);
+         set_actionlist_char_var();
+ 
+@@ -12104,6 +12396,14 @@ sub read_options {
+     $testonly = 0;
+     $help = 0;
+     $version = 0;
++    ################
++    # + Jan Lejnar #
++    ################
++    $parseEventTime = 0;
++    $parsedTimeOrder = 0;
++    $dontParseEventTime = 0;
++    $timeFilterFrom = undef;
++    $timeFilterTo = undef;
+ 
+     # parse the options given in command line and in SEC resource file
+     # (GetOptions() prints parsing error messages to standard error)
+@@ -12141,7 +12441,15 @@ sub read_options {
+         "intcontexts!"                    => \$intcontexts,
+         "testonly!"                       => \$testonly,
+         "help|?"                          => \$help,
+-        "version"                         => \$version );
++        "version"                         => \$version,
++        ################
++        # + Jan Lejnar #
++        ################
++        "parseEventTime"                  => \$parseEventTime,
++        "parsedTimeOrder"                 => \$parsedTimeOrder,
++        "dontParseEventTime"              => \$dontParseEventTime,
++        "timeFilterFrom=s"                => \$timeFilterFrom,
++        "timeFilterTo=s"                  => \$timeFilterTo);
+ 
+     # check the values received from command line and resource file
+     # and set option variables back to defaults, if necessary
+@@ -12263,6 +12571,42 @@ sub read_options {
+         $umask = undef;
+     }
+ 
++    ################
++    # + Jan Lejnar #
++    ################
++    if ($parsedTimeOrder && !$parseEventTime) {
++        print STDERR "'--parsedTimeOrder' parameter can be used only in combination with --parseEventTime\n";
++        $parsedTimeOrder = undef;
++    }
++
++    if (defined($timeFilterFrom)) {
++        $timeFilterFrom = str2time($timeFilterFrom);
++        if (!defined($timeFilterFrom)) {
++            print STDERR "'--timeFilterFrom' parameter has wrong date format, for more information look into help\n";
++            $timeFilterFrom = undef;
++        }
++    }
++
++    if (defined($timeFilterTo)) {
++        $timeFilterTo = str2time($timeFilterTo);
++        if (!defined($timeFilterTo)) {
++            print STDERR "'--timeFilterTo' parameter has wrong date format, for more information look into help\n";
++            $timeFilterTo = undef;
++        }
++    }
++
++    if ((defined($timeFilterFrom) || defined($timeFilterTo)) && !($parsedTimeOrder && $parseEventTime)) {
++        print STDERR "Error, time filters can be at the moment used only in combination with --parsedTimeOrder (plus with --parseEventTime)\n";
++        $timeFilterFrom = undef;
++        $timeFilterTo = undef;
++    }
++
++    if ($dontParseEventTime) {
++        $parseEventTime = 0;
++        $parsedTimeOrder = 0;
++    }
++    ################
++
+     # in the case of --bufsize=1, always enable the --jointbuf option,
+     # since there is no need to maintain multiple input buffers
+ 
+@@ -12311,7 +12655,15 @@ sub main_loop {
+             $line = shift @readbuffer;
+             $file = shift @readbuffer;
+         } else {
+-            read_line($line, $file);
++            ################
++            # + Jan Lejnar #
++            ################
++            if ($parseEventTime && $parsedTimeOrder) {
++                readRecentLineToReadbuffer($line, $file);
++            } else {
++                read_line($line, $file);
++            }
++            ################
+         }
+ 
+         if (defined($line)) {
+@@ -12390,8 +12742,9 @@ sub main_loop {
+         # search lists for accomplishing timed tasks and removing obsolete elements
+ 
+         if (time() - $lastcleanuptime >= $cleantime) {
++            # OK
+             process_lists();
+-            $lastcleanuptime = time();
++            $lastcleanuptime = time(); # OK
+         }
+ 
+         # check signal flags
+@@ -12619,7 +12972,7 @@ $int_context = { "Time" => time(),
+     "Action"            => [ ],
+     "Desc"              => "SEC internal",
+     "Internal"          => 1,
+-    "Aliases"           => { } };
++    "Aliases"           => { } }; # OK creating of internal context?
+ 
+ ### ignore SIGPIPE (done before generating any output)
+ 
+@@ -12733,7 +13086,7 @@ $SIG{TERM} = \&term_handler;
+ 
+ ### Set various global variables
+ 
+-$startuptime = time();
++$startuptime = time(); # OK
+ $processedlines = 0;
+ 
+ ### Initialize input buffers
+@@ -12754,7 +13107,7 @@ arrange_input_buffers();
+ 
+ ### Initialize builtin action list variables
+ 
+-$timevar_update = time();
++$timevar_update = time(); # OK
+ set_actionlist_time_var($timevar_update);
+ set_actionlist_char_var();
+ 
+@@ -12766,7 +13119,7 @@ if ($intevents) { internal_event("SEC_STARTUP"); }
+ ### (triggers Calendar rules, must be done between SEC_STARTUP and main loop)
+ 
+ process_lists();
+-$lastcleanuptime = time();
++$lastcleanuptime = time(); # OK
+ 
+ ### read lines from input stream and process them
+ 
